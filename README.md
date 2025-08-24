@@ -1,6 +1,6 @@
 # pa11y-go-wrapper
 
-A command-line tool that wraps the `pa11y` accessibility analyzer and provides the output in JSON format.
+An API server that wraps the `pa11y` accessibility analyzer. It allows you to perform direct analysis or queue pages for analysis.
 
 ## Installation
 
@@ -15,56 +15,90 @@ Before you can use this tool, you need to have the following installed on your s
     npm install -g pa11y
     ```
 
-### Building the wrapper
+### Building the server
 
-Once you have the prerequisites installed, you can build the wrapper from source:
+Once you have the prerequisites installed, you can build the server from source:
 
 ```bash
-go build main.go -o pa11y-go-wrapper
+go build -o pa11y-go-server cmd/server/main.go
 ```
 
-This will create an executable file named `pa11y-go-wrapper` in the current directory. You can move this file to a directory in your system's PATH to make it accessible from anywhere.
+This will create an executable file named `pa11y-go-server` in the current directory.
 
 ## Usage
 
-### Checking the installation
-
-To verify that all dependencies are installed correctly, you can use the `--check-install` flag:
+To start the server, run the following command:
 
 ```bash
-./pa11y-go-wrapper --check-install
+./pa11y-go-server
 ```
 
-If everything is set up correctly, you will see the following output:
+The server will start on port 8080.
 
-```
-pa11y is installed and ready to use.
-```
+## API
 
-If `pa11y` is not installed or not in your PATH, you will see an error message.
+The server exposes the following API endpoints:
 
-### Analyzing a web page
+### `POST /api/analyze`
 
-To analyze a web page for accessibility issues, provide the URL as a command-line argument.
+Performs a direct (synchronous) analysis of a URL.
 
-```bash
-./pa11y-go-wrapper https://example.com
-```
+**Request Body:**
 
-By default, the `htmlcs` runner is used. You can specify a different runner using the `--runner` flag.
-
-#### Using the axe runner
-
-To use the `axe` runner, use the `--runner=axe` flag:
-
-```bash
-./pa11y-go-wrapper --runner=axe https://example.com
+```json
+{
+  "url": "https://example.com",
+  "runner": "htmlcs"
+}
 ```
 
-The tool will run `pa11y` with the specified runner and print a JSON report of the accessibility issues found on the page.
+*   `url` (string, required): The URL to analyze.
+*   `runner` (string, optional): The test runner to use (e.g., `htmlcs`, `axe`). Defaults to `htmlcs`.
 
-## Dependencies
+**Response:**
 
-*   [Go](https://golang.org/)
-*   [Node.js](https://nodejs.org/)
-*   [pa11y](https://github.com/pa11y/pa11y)
+The response will be the JSON output from `pa11y`.
+
+### `POST /api/queue`
+
+Adds a URL to the analysis queue.
+
+**Request Body:**
+
+```json
+{
+  "url": "https://example.com"
+}
+```
+
+*   `url` (string, required): The URL to add to the queue.
+
+**Response:**
+
+The response will be a JSON object representing the newly created analysis task.
+
+```json
+{
+  "id": "1662556965142624000",
+  "url": "https://example.com",
+  "status": "pending",
+  "createdAt": "2022-09-07T13:22:45.142624Z",
+  "updatedAt": "2022-09-07T13:22:45.142624Z"
+}
+```
+
+### `GET /api/queue`
+
+Lists all analysis tasks and their statuses.
+
+**Response:**
+
+The response will be a JSON array of analysis tasks.
+
+### `GET /api/queue/:id`
+
+Retrieves the details and analysis result of a specific task.
+
+**Response:**
+
+The response will be a JSON object representing the analysis task. If the analysis is complete, the `result` field will contain the `pa11y` output.
