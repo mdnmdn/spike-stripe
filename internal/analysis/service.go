@@ -43,6 +43,9 @@ type Analysis struct {
 	ErrorMessage string         `json:"errorMessage,omitempty"`
 	CreatedAt    time.Time      `json:"createdAt"`
 	UpdatedAt    time.Time      `json:"updatedAt"`
+	StartedAt    time.Time      `json:"startedAt,omitempty"`
+	CompletedAt  time.Time      `json:"completedAt,omitempty"`
+	DurationMs   int64          `json:"durationMs,omitempty"`
 }
 
 // Service provides operations for managing analysis tasks.
@@ -126,8 +129,31 @@ func (s *Service) UpdateStatus(id string, status AnalysisStatus) {
 	defer s.mu.Unlock()
 
 	if analysis, ok := s.analyses[id]; ok {
+		now := time.Now()
+		// Transition-specific timestamps
+		if status == StatusProcessing {
+			if analysis.StartedAt.IsZero() {
+				analysis.StartedAt = now
+			}
+		}
+		if status == StatusCompleted || status == StatusFailed {
+			if analysis.CompletedAt.IsZero() {
+				analysis.CompletedAt = now
+			}
+			// Compute duration from StartedAt if available, otherwise from CreatedAt
+			start := analysis.StartedAt
+			if start.IsZero() {
+				start = analysis.CreatedAt
+			}
+			dur := analysis.CompletedAt.Sub(start)
+			if dur < 0 {
+				dur = 0
+			}
+			analysis.DurationMs = dur.Milliseconds()
+		}
+
 		analysis.Status = status
-		analysis.UpdatedAt = time.Now()
+		analysis.UpdatedAt = now
 	}
 }
 
@@ -137,9 +163,26 @@ func (s *Service) UpdateResult(id string, status AnalysisStatus, result []Issue,
 	defer s.mu.Unlock()
 
 	if analysis, ok := s.analyses[id]; ok {
+		now := time.Now()
 		analysis.Status = status
 		analysis.Result = result
 		analysis.ErrorMessage = errorMessage
-		analysis.UpdatedAt = time.Now()
+
+		if status == StatusCompleted || status == StatusFailed {
+			if analysis.CompletedAt.IsZero() {
+				analysis.CompletedAt = now
+			}
+			start := analysis.StartedAt
+			if start.IsZero() {
+				start = analysis.CreatedAt
+			}
+			dur := analysis.CompletedAt.Sub(start)
+			if dur < 0 {
+				dur = 0
+			}
+			analysis.DurationMs = dur.Milliseconds()
+		}
+
+		analysis.UpdatedAt = now
 	}
 }

@@ -46,6 +46,7 @@
                         <th class="px-4 py-2">ID</th>
                         <th class="px-4 py-2">URL</th>
                         <th class="px-4 py-2">Status</th>
+                        <th class="px-4 py-2">Duration</th>
                         <th class="px-4 py-2">Created At</th>
                         <th class="px-4 py-2">Actions</th>
                         <th class="px-4 py-2">Reports</th>
@@ -55,7 +56,12 @@
                     <tr v-for="item in queue" :key="item.id" class="border-t">
                         <td class="px-4 py-2">{{ item.id }}</td>
                         <td class="px-4 py-2">{{ item.url }}</td>
-                        <td class="px-4 py-2">{{ item.status }}</td>
+                        <td class="px-4 py-2">
+                            <span :class="statusBadgeClass(item.status)" class="px-2 py-1 rounded text-xs font-semibold">
+                                {{ item.status }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2">{{ item.durationMs ? formatDuration(item.durationMs) : '-' }}</td>
                         <td class="px-4 py-2">{{ new Date(item.createdAt).toLocaleString() }}</td>
                         <td class="px-4 py-2">
                             <button @click="getQueueItem(item.id)" class="bg-blue-500 text-white p-1 rounded-md hover:bg-blue-600">View</button>
@@ -99,7 +105,8 @@
                     <div><span class="font-semibold">ID:</span> {{ result.id }}</div>
                     <div><span class="font-semibold">URL:</span> {{ result.url }}</div>
                     <div><span class="font-semibold">Runner:</span> {{ result.runner || 'htmlcs' }}</div>
-                    <div><span class="font-semibold">Status:</span> {{ result.status }}</div>
+                    <div><span class="font-semibold">Status:</span> <span :class="statusBadgeClass(result.status)" class="px-2 py-1 rounded text-xs font-semibold">{{ result.status }}</span></div>
+                    <div><span class="font-semibold">Duration:</span> {{ result.durationMs ? formatDuration(result.durationMs) : '-' }}</div>
                     <div><span class="font-semibold">Created At:</span> {{ result.createdAt ? new Date(result.createdAt).toLocaleString() : '-' }}</div>
                     <div><span class="font-semibold">Updated At:</span> {{ result.updatedAt ? new Date(result.updatedAt).toLocaleString() : '-' }}</div>
                 </div>
@@ -246,6 +253,35 @@
                     if (this.pollTimer) {
                         clearInterval(this.pollTimer);
                         this.pollTimer = null;
+                    }
+                },
+                formatDuration(ms) {
+                    // Simple human-readable formatter
+                    if (ms == null) return '-';
+                    const s = Math.floor(ms / 1000);
+                    const msR = ms % 1000;
+                    const h = Math.floor(s / 3600);
+                    const m = Math.floor((s % 3600) / 60);
+                    const sec = s % 60;
+                    const parts = [];
+                    if (h) parts.push(h + 'h');
+                    if (m) parts.push(m + 'm');
+                    if (sec || (!h && !m)) parts.push(sec + 's');
+                    if (!h && !m && ms < 1000) parts.push(msR + 'ms');
+                    return parts.join(' ');
+                },
+                statusBadgeClass(status) {
+                    switch (status) {
+                        case 'completed':
+                            return 'bg-green-100 text-green-800';
+                        case 'failed':
+                        case 'error':
+                            return 'bg-red-100 text-red-800';
+                        case 'processing':
+                            return 'bg-yellow-100 text-yellow-800';
+                        case 'pending':
+                        default:
+                            return 'bg-gray-100 text-gray-800';
                     }
                 }
             },
