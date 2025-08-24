@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 	"log"
+	"net"
+	"os"
 	"pa11y-go-wrapper/internal/analysis"
 	"pa11y-go-wrapper/internal/api"
 )
@@ -20,7 +22,29 @@ func main() {
 
 	// Create and run the Gin server
 	router := api.NewRouter(analysisService, frontendAssets)
-	if err := router.Run(":8080"); err != nil {
+
+	addr := getServerAddr()
+
+	log.Printf("Starting server on %s", addr)
+	if err := router.Run(addr); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
+}
+
+func getServerAddr() string {
+	addr := os.Getenv("APP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+
+	port := os.Getenv("PORT")
+	if port != "" {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			// addr is just a port, so we can ignore the error and use an empty host
+			host = ""
+		}
+		addr = net.JoinHostPort(host, port)
+	}
+	return addr
 }

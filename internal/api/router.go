@@ -14,10 +14,6 @@ func NewRouter(service *analysis.Service, frontendAssets embed.FS) *gin.Engine {
 	r := gin.Default()
 	h := NewHandlers(service)
 
-	// Serve the frontend
-	staticFiles, _ := fs.Sub(frontendAssets, "frontend")
-	r.StaticFS("/", http.FS(staticFiles))
-
 	api := r.Group("/api")
 	{
 		api.POST("/analyze", h.AnalyzeURL)
@@ -27,6 +23,13 @@ func NewRouter(service *analysis.Service, frontendAssets embed.FS) *gin.Engine {
 		api.GET("/completed/html", h.GetCompletedAnalysesHTML)
 		api.GET("/completed/pdf", h.GetCompletedAnalysesPDF)
 	}
+
+	// Serve the frontend
+	staticFiles, _ := fs.Sub(frontendAssets, "frontend")
+	r.StaticFS("/app", http.FS(staticFiles))
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/app")
+	})
 
 	return r
 }

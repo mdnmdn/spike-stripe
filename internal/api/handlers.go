@@ -76,7 +76,19 @@ func (h *Handlers) GetQueueItem(c *gin.Context) {
 
 // GetCompletedAnalysesHTML returns all completed analysis tasks as an HTML page.
 func (h *Handlers) GetCompletedAnalysesHTML(c *gin.Context) {
-	analyses := h.service.GetCompleted()
+	id := c.Query("id")
+	var analyses []*analysis.Analysis
+	if id != "" {
+		a, ok := h.service.GetByID(id)
+		if !ok {
+			c.String(http.StatusNotFound, "analysis not found")
+			return
+		}
+		analyses = []*analysis.Analysis{a}
+	} else {
+		analyses = h.service.GetCompleted()
+	}
+
 	html, err := GenerateHTML(analyses)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "failed to generate HTML")
@@ -88,7 +100,19 @@ func (h *Handlers) GetCompletedAnalysesHTML(c *gin.Context) {
 
 // GetCompletedAnalysesPDF returns all completed analysis tasks as a PDF file.
 func (h *Handlers) GetCompletedAnalysesPDF(c *gin.Context) {
-	analyses := h.service.GetCompleted()
+	id := c.Query("id")
+	var analyses []*analysis.Analysis
+	if id != "" {
+		a, ok := h.service.GetByID(id)
+		if !ok {
+			c.String(http.StatusNotFound, "analysis not found")
+			return
+		}
+		analyses = []*analysis.Analysis{a}
+	} else {
+		analyses = h.service.GetCompleted()
+	}
+
 	pdf, err := GeneratePDF(analyses)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "failed to generate PDF")

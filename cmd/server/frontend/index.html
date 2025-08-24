@@ -48,6 +48,7 @@
                         <th class="px-4 py-2">Status</th>
                         <th class="px-4 py-2">Created At</th>
                         <th class="px-4 py-2">Actions</th>
+                        <th class="px-4 py-2">Reports</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -59,6 +60,12 @@
                         <td class="px-4 py-2">
                             <button @click="getQueueItem(item.id)" class="bg-blue-500 text-white p-1 rounded-md hover:bg-blue-600">View</button>
                         </td>
+                        <td class="px-4 py-2">
+                            <div v-if="item.status === 'completed'">
+                                <a :href="'/api/completed/html?id=' + item.id" target="_blank" class="bg-blue-500 text-white p-1 rounded-md hover:bg-blue-600">HTML</a>
+                                <a :href="'/api/completed/pdf?id=' + item.id" target="_blank" class="bg-red-500 text-white p-1 rounded-md hover:bg-red-600">PDF</a>
+                            </div>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -68,6 +75,11 @@
         <div v-if="result" class="bg-white p-6 rounded-lg shadow-lg">
             <h2 class="text-2xl font-bold mb-4">Analysis Result</h2>
             <pre class="bg-gray-200 p-4 rounded-md overflow-x-auto"><code>{{ JSON.stringify(result, null, 2) }}</code></pre>
+            <div v-if="result.status === 'completed'" class="mt-4">
+                <h3 class="text-xl font-bold mb-2">Reports</h3>
+                <a :href="'/api/completed/html?id=' + result.id" target="_blank" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">View HTML Report</a>
+                <a :href="'/api/completed/pdf?id=' + result.id" target="_blank" class="bg-red-500 text-white p-2 rounded-md hover:bg-red-600">View PDF Report</a>
+            </div>
         </div>
     </div>
 
