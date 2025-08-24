@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stripe/stripe-go/v79"
-	"github.com/stripe/stripe-go/v79/checkout/session"
-	"github.com/stripe/stripe-go/v79/webhook"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/checkout/session"
+	"github.com/stripe/stripe-go/v82/webhook"
 )
 
 // Config holds Stripe-related configuration. Values can be empty for local spikes.
@@ -124,8 +124,10 @@ func (s *Service) ProcessWebhook(payload []byte, signature string) (*WebhookEven
 		}, nil
 	}
 
-	// Verify webhook signature
-	event, err := webhook.ConstructEvent(payload, signature, s.cfg.WebhookSecret)
+	// Verify webhook signature with option to ignore API version mismatch
+	event, err := webhook.ConstructEventWithOptions(payload, signature, s.cfg.WebhookSecret, webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("webhook signature verification failed: %w", err)
 	}

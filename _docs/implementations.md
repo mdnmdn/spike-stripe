@@ -62,6 +62,7 @@ The Stripe Go Spike is a complete Go HTTP API for prototyping Stripe payment int
 - All transactions (admin): `GET /api/transactions`
 - Checkout session creation: `POST /api/checkout-session`
 - Webhook handling: `POST /api/webhook`
+- Audit events query: `GET /api/audit-events`
 
 **Payment Service Layer (`internal/payments/service.go`):**
 - Full Stripe integration with fallback to mock mode
@@ -122,14 +123,61 @@ CREATE TABLE transactions (
 - **With Stripe Keys**: Full Stripe integration with real checkout sessions
 - **Without Keys**: Mock mode for development and testing
 
-#### 5. Data Management (`internal/data/`)
+#### 5. Audit System (`internal/audit/`)
+
+**Comprehensive Event Logging:**
+- Generic audit service for logging system events across all subsystems
+- Automatic audit logging integrated into all critical operations
+- JSON payload support for structured event data storage
+- Complete audit trail from transaction creation to webhook processing
+
+**Database Schema:**
+```sql
+CREATE TABLE audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    subsystem TEXT NOT NULL,          -- e.g., 'stripe', 'payment', 'system'
+    event_type TEXT NOT NULL,         -- e.g., 'webhook.received', 'transaction.created'
+    user_id TEXT,                     -- user identifier (nullable)
+    information TEXT,                 -- human-readable description
+    payload TEXT                      -- JSON data (nullable)
+);
+```
+
+**Audit Service Layer:**
+- Service pattern with convenience methods: `LogStripe()`, `LogPayment()`, `LogSystem()`
+- Automatic JSON marshaling of event payloads
+- Type-safe database operations using SQLc
+- Error handling that doesn't break main application flow
+
+**Event Types Logged:**
+
+*Stripe Subsystem:*
+- `webhook.received` - Raw webhook data including body, signature, full payload
+- `webhook.processed` - Successful processing with event type details
+- `webhook.processing_failed` - Processing errors with failure details
+- `checkout_session.completed` - Session completion events
+- `checkout_session.failed` - Session creation failures
+
+*Payment Subsystem:*
+- `transaction.created` - Transaction metadata at creation time (user, product, amount)
+- `transaction.completed` - Database update success after webhook
+- `transaction.update_failed` - Database update failures with error details
+
+**API Query Endpoint:**
+- `GET /api/audit-events` - Query audit events with filtering and pagination
+- Query parameters: `subsystem`, `event_type`, `user_id`, `limit`, `offset`
+- JSON response format with complete event details including parsed payloads
+
+#### 6. Data Management (`internal/data/`)
 
 **Hardcoded Data Models:**
 - User and Product structs with JSON serialization
 - Helper functions for data retrieval
 - Clean separation between hardcoded data and database entities
+- Audit event models for API responses
 
-#### 6. Development Infrastructure
+#### 7. Development Infrastructure
 
 **Build System:**
 - Go modules with all required dependencies including Stripe Go SDK
@@ -157,12 +205,14 @@ CREATE TABLE transactions (
 │       └── index.html          ✅ Complete user interface with API integration
 ├── internal/
 │   ├── api/
-│   │   ├── router.go          ✅ Complete route configuration
-│   │   └── handlers.go        ✅ Complete API handlers with database integration
+│   │   ├── router.go          ✅ Complete route configuration with audit endpoint
+│   │   └── handlers.go        ✅ Complete API handlers with audit logging
 │   ├── data/
-│   │   └── models.go          ✅ Hardcoded data models and helpers
+│   │   └── models.go          ✅ Hardcoded data models and audit event types
 │   ├── payments/
 │   │   └── service.go         ✅ Complete Stripe integration with mock fallback
+│   ├── audit/
+│   │   └── service.go         ✅ Comprehensive audit logging service
 │   ├── db/                    ✅ Complete SQLc generated database layer
 │   │   ├── connection.go      ✅ Database connection management
 │   │   ├── migrate.go         ✅ Migration runner
@@ -173,10 +223,12 @@ CREATE TABLE transactions (
 ├── db/
 │   ├── migrations/
 │   │   ├── 0001_cache.sql     ✅ Cache table migration
-│   │   └── 0002_transactions.sql ✅ Transactions table migration
+│   │   ├── 0002_transactions.sql ✅ Transactions table migration
+│   │   └── 0003_audit_events.sql ✅ Audit events table migration
 │   └── queries/
 │       ├── cache.sql          ✅ Cache queries
-│       └── transactions.sql   ✅ Transaction queries
+│       ├── transactions.sql   ✅ Transaction queries
+│       └── audit_events.sql   ✅ Audit event queries
 ├── _docs/
 │   ├── agents.md              ✅ Project architecture guide
 │   ├── spike-feature.md       ✅ Feature specifications
@@ -258,6 +310,11 @@ go test ./...
 - `POST /api/checkout-session` - Create Stripe checkout session
 - `POST /api/webhook` - Process Stripe webhook events
 
+### Audit Endpoints
+- `GET /api/audit-events` - Query audit events with optional filtering
+  - Query parameters: `subsystem`, `event_type`, `user_id`, `limit`, `offset`
+  - Example: `/api/audit-events?subsystem=stripe&event_type=webhook.received&limit=10`
+
 ### Request/Response Examples
 
 **Create Checkout Session:**
@@ -272,6 +329,28 @@ curl -X POST http://localhost:8060/api/checkout-session \
 {
   "session_id": "cs_test_...",
   "url": "https://checkout.stripe.com/c/pay/cs_test_..."
+}
+```
+
+**Query Audit Events:**
+```bash
+curl "http://localhost:8060/api/audit-events?subsystem=payment&limit=3"
+```
+
+**Response:**
+```json
+{
+  "events": [
+    {
+      "id": 32,
+      "timestamp": "2025-08-24T23:21:43Z",
+      "subsystem": "payment",
+      "event_type": "transaction.created",
+      "user_id": "luke",
+      "information": "Transaction created for checkout session",
+      "payload": "{\"amount\":4999,\"currency\":\"usd\",\"product_id\":\"lumaweave\",\"product_name\":\"LumaWeave Reactive Threads\",\"transaction_id\":\"d9ca4b0c-2b65-4c31-91dc-1144d8b0c67d\",\"user_id\":\"luke\"}"
+    }
+  ]
 }
 ```
 
@@ -305,6 +384,14 @@ curl -X POST http://localhost:8060/api/checkout-session \
 - Webhook signature verification
 - Database connection error handling
 
+### ✅ Comprehensive Audit System
+- Complete event logging for all system operations
+- Automatic audit trail from transaction creation to webhook processing
+- Structured JSON payload storage for detailed event information
+- Query API with filtering by subsystem, event type, user, and time
+- Real-time monitoring and debugging capabilities
+- Full webhook payload logging including raw Stripe data
+
 ### ✅ Testing Infrastructure
 - Complete test suite for API endpoints
 - In-memory database testing
@@ -327,5 +414,6 @@ curl -X POST http://localhost:8060/api/checkout-session \
 3. ✅ **Complete Error Handling**: Comprehensive error handling at all layers
 4. ✅ **User Authentication**: Session-based user selection (suitable for prototyping)
 5. ✅ **Real-time Updates**: Transaction status updates via webhooks
+6. ✅ **Comprehensive Audit Logging**: Full event tracking and monitoring system
 
 This implementation provides a complete, production-ready Stripe payment integration spike with comprehensive database persistence, real-time updates, and a polished user interface. The system successfully handles the complete payment lifecycle from product selection to payment completion and status updates.

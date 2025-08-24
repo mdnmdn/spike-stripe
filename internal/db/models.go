@@ -8,6 +8,16 @@ import (
 	"database/sql"
 )
 
+type AuditEvent struct {
+	ID          int64          `json:"id"`
+	Timestamp   string         `json:"timestamp"`
+	Subsystem   string         `json:"subsystem"`
+	EventType   string         `json:"event_type"`
+	UserID      sql.NullString `json:"user_id"`
+	Information sql.NullString `json:"information"`
+	Payload     sql.NullString `json:"payload"`
+}
+
 type Cache struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`

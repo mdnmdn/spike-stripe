@@ -6,7 +6,11 @@
       "Bash(go:*)",
       "Bash(curl:*)",
       "Bash(sqlc:*)",
-      "Bash(RUN_MIGRATION=true go run cmd/server/main.go)"
+      "Bash(RUN_MIGRATION=true go run cmd/server/main.go)",
+      "Bash(stripe listen:*)",
+      "Bash(stripe trigger:*)",
+      "Bash(sqlite3:*)",
+      "Bash(RUN_MIGRATION=false go run cmd/server/main.go)"
     ],
     "deny": [],
     "ask": []

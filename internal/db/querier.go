@@ -10,8 +10,15 @@ import (
 )
 
 type Querier interface {
+	CreateAuditEvent(ctx context.Context, arg CreateAuditEventParams) error
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) error
 	DeleteCacheKey(ctx context.Context, key string) error
+	GetAllAuditEvents(ctx context.Context, arg GetAllAuditEventsParams) ([]AuditEvent, error)
+	GetAuditEventsByEventType(ctx context.Context, arg GetAuditEventsByEventTypeParams) ([]AuditEvent, error)
+	GetAuditEventsBySubsystem(ctx context.Context, arg GetAuditEventsBySubsystemParams) ([]AuditEvent, error)
+	GetAuditEventsBySubsystemAndType(ctx context.Context, arg GetAuditEventsBySubsystemAndTypeParams) ([]AuditEvent, error)
+	GetAuditEventsByUser(ctx context.Context, arg GetAuditEventsByUserParams) ([]AuditEvent, error)
+	GetAuditEventsInDateRange(ctx context.Context, arg GetAuditEventsInDateRangeParams) ([]AuditEvent, error)
 	GetCacheValue(ctx context.Context, key string) (string, error)
 	GetTransaction(ctx context.Context, id string) (Transaction, error)
 	GetTransactionByStripeSessionID(ctx context.Context, stripeSessionID sql.NullString) (Transaction, error)

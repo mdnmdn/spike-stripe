@@ -82,3 +82,14 @@ func GetProductByID(id string) *Product {
 	}
 	return nil
 }
+
+// AuditEvent represents an audit event for API responses
+type AuditEvent struct {
+	ID          int64     `json:"id"`
+	Timestamp   time.Time `json:"timestamp"`
+	Subsystem   string    `json:"subsystem"`
+	EventType   string    `json:"event_type"`
+	UserID      *string   `json:"user_id,omitempty"`
+	Information *string   `json:"information,omitempty"`
+	Payload     *string   `json:"payload,omitempty"`
+}

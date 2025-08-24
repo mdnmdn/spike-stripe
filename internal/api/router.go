@@ -5,6 +5,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"stripe-go-spike/internal/audit"
 	"stripe-go-spike/internal/db"
 	"stripe-go-spike/internal/payments"
 
@@ -14,7 +15,8 @@ import (
 // NewRouter creates a new Gin router.
 func NewRouter(service *payments.Service, database *sql.DB, queries *db.Queries, frontendAssets embed.FS) *gin.Engine {
 	r := gin.Default()
-	h := NewHandlers(service, database, queries)
+	auditService := audit.NewService(queries)
+	h := NewHandlers(service, database, queries, auditService)
 
 	api := r.Group("/api")
 	{
@@ -25,6 +27,7 @@ func NewRouter(service *payments.Service, database *sql.DB, queries *db.Queries,
 		api.GET("/transactions", h.GetAllTransactions)
 		api.POST("/checkout-session", h.CreateCheckoutSession)
 		api.POST("/webhook", h.Webhook)
+		api.GET("/audit-events", h.GetAuditEvents)
 	}
 
 	// Serve the frontend if available
