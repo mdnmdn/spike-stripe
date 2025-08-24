@@ -1,29 +1,28 @@
 package api
 
 import (
+	"embed"
 	"net/http"
 	"net/http/httptest"
 	"pa11y-go-wrapper/internal/analysis"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
+// Embed local test frontend assets so fs.Sub works in router
+//
+//go:embed frontend/*
+var frontendAssets embed.FS
+
 func TestCompletedHTML(t *testing.T) {
 	// Create a new analysis service and add a completed analysis
 	service := analysis.NewService(10)
-	completedAnalysis := &analysis.Analysis{
-		ID:        "test-id",
-		URL:       "http://example.com",
-		Status:    analysis.StatusCompleted,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	service.UpdateResult(completedAnalysis.ID, completedAnalysis.Status, nil)
+	a := service.Create("http://example.com", "")
+	service.UpdateResult(a.ID, analysis.StatusCompleted, nil, "")
 
 	// Create a new router
-	router := NewRouter(service)
+	router := NewRouter(service, frontendAssets)
 
 	// Create a new request to the /completed/html endpoint
 	req, _ := http.NewRequest("GET", "/api/completed/html", nil)
@@ -32,23 +31,17 @@ func TestCompletedHTML(t *testing.T) {
 
 	// Check that the response is correct
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "<h1>Completed Analyses</h1>")
+	assert.Contains(t, w.Body.String(), "<h1>Accessibility Analyses</h1>")
 }
 
 func TestCompletedPDF(t *testing.T) {
 	// Create a new analysis service and add a completed analysis
 	service := analysis.NewService(10)
-	completedAnalysis := &analysis.Analysis{
-		ID:        "test-id",
-		URL:       "http://example.com",
-		Status:    analysis.StatusCompleted,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	service.UpdateResult(completedAnalysis.ID, completedAnalysis.Status, nil)
+	a := service.Create("http://example.com", "")
+	service.UpdateResult(a.ID, analysis.StatusCompleted, nil, "")
 
 	// Create a new router
-	router := NewRouter(service)
+	router := NewRouter(service, frontendAssets)
 
 	// Create a new request to the /completed/pdf endpoint
 	req, _ := http.NewRequest("GET", "/api/completed/pdf", nil)

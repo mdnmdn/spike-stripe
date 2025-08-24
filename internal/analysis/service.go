@@ -35,13 +35,14 @@ type Issue struct {
 
 // Analysis represents a single analysis task.
 type Analysis struct {
-	ID        string         `json:"id"`
-	URL       string         `json:"url"`
-	Runner    string         `json:"runner,omitempty"`
-	Status    AnalysisStatus `json:"status"`
-	Result    []Issue        `json:"result,omitempty"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	ID           string         `json:"id"`
+	URL          string         `json:"url"`
+	Runner       string         `json:"runner,omitempty"`
+	Status       AnalysisStatus `json:"status"`
+	Result       []Issue        `json:"result,omitempty"`
+	ErrorMessage string         `json:"errorMessage,omitempty"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
 }
 
 // Service provides operations for managing analysis tasks.
@@ -131,13 +132,14 @@ func (s *Service) UpdateStatus(id string, status AnalysisStatus) {
 }
 
 // UpdateResult updates the result of an analysis task.
-func (s *Service) UpdateResult(id string, status AnalysisStatus, result []Issue) {
+func (s *Service) UpdateResult(id string, status AnalysisStatus, result []Issue, errorMessage string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if analysis, ok := s.analyses[id]; ok {
 		analysis.Status = status
 		analysis.Result = result
+		analysis.ErrorMessage = errorMessage
 		analysis.UpdatedAt = time.Now()
 	}
 }

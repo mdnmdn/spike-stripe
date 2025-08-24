@@ -3,9 +3,13 @@ package analysis
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // RunPa11y executes the pa11y command and returns the result.
@@ -83,15 +87,59 @@ func (w *Worker) Start() {
 
 			w.service.UpdateStatus(analysis.ID, StatusProcessing)
 
+			// Check URL reachability before running pa11y
+			if err := checkURLReachable(analysis.URL); err != nil {
+				fmt.Fprintf(os.Stderr, "URL not reachable %s: %v\n", analysis.URL, err)
+				w.service.UpdateResult(analysis.ID, StatusFailed, nil, fmt.Sprintf("URL not reachable: %v", err))
+				continue
+			}
+
 			// Use the specified runner if provided; RunPa11y defaults to htmlcs when empty
 			result, err := RunPa11y(analysis.URL, analysis.Runner)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error running pa11y for %s: %v\n", analysis.URL, err)
-				w.service.UpdateResult(analysis.ID, StatusFailed, nil)
+				w.service.UpdateResult(analysis.ID, StatusFailed, nil, err.Error())
 				continue
 			}
 
-			w.service.UpdateResult(analysis.ID, StatusCompleted, result)
+			w.service.UpdateResult(analysis.ID, StatusCompleted, result, "")
 		}
 	}()
+}
+
+// checkURLReachable performs a direct GET request to verify reachability.
+// It validates the URL scheme (http/https), performs the request with a timeout,
+// and returns a descriptive error if the URL is not reachable or returns 4xx/5xx.
+func checkURLReachable(rawURL string) error {
+	// Validate URL
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported URL scheme: %s", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("invalid URL: missing host")
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("User-Agent", "pa11y-go-wrapper/1.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	// drain body to allow connection reuse
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("received HTTP status %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+	return nil
 }
