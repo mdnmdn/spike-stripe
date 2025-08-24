@@ -17,6 +17,8 @@ func NewRouter(service *analysis.Service) *gin.Engine {
 		api.POST("/queue", h.QueueURL)
 		api.GET("/queue", h.GetQueue)
 		api.GET("/queue/:id", h.GetQueueItem)
+		api.GET("/completed/html", h.GetCompletedAnalysesHTML)
+		api.GET("/completed/pdf", h.GetCompletedAnalysesPDF)
 	}
 
 	return r

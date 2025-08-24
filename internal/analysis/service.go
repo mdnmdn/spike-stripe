@@ -77,6 +77,20 @@ func (s *Service) GetAll() []*Analysis {
 	return analyses
 }
 
+// GetCompleted returns all completed analysis tasks.
+func (s *Service) GetCompleted() []*Analysis {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	analyses := make([]*Analysis, 0, len(s.analyses))
+	for _, analysis := range s.analyses {
+		if analysis.Status == StatusCompleted {
+			analyses = append(analyses, analysis)
+		}
+	}
+	return analyses
+}
+
 // GetByID returns an analysis task by its ID.
 func (s *Service) GetByID(id string) (*Analysis, bool) {
 	s.mu.RLock()

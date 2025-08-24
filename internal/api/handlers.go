@@ -73,3 +73,27 @@ func (h *Handlers) GetQueueItem(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, analysis)
 }
+
+// GetCompletedAnalysesHTML returns all completed analysis tasks as an HTML page.
+func (h *Handlers) GetCompletedAnalysesHTML(c *gin.Context) {
+	analyses := h.service.GetCompleted()
+	html, err := GenerateHTML(analyses)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "failed to generate HTML")
+		return
+	}
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+}
+
+// GetCompletedAnalysesPDF returns all completed analysis tasks as a PDF file.
+func (h *Handlers) GetCompletedAnalysesPDF(c *gin.Context) {
+	analyses := h.service.GetCompleted()
+	pdf, err := GeneratePDF(analyses)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "failed to generate PDF")
+		return
+	}
+
+	c.Data(http.StatusOK, "application/pdf", pdf)
+}
