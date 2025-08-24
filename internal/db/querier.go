@@ -6,13 +6,21 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
+	CreateTransaction(ctx context.Context, arg CreateTransactionParams) error
 	DeleteCacheKey(ctx context.Context, key string) error
 	GetCacheValue(ctx context.Context, key string) (string, error)
+	GetTransaction(ctx context.Context, id string) (Transaction, error)
+	GetTransactionByStripeSessionID(ctx context.Context, stripeSessionID sql.NullString) (Transaction, error)
+	ListAllTransactions(ctx context.Context, arg ListAllTransactionsParams) ([]Transaction, error)
 	ListCache(ctx context.Context) ([]Cache, error)
+	ListTransactionsByUserID(ctx context.Context, arg ListTransactionsByUserIDParams) ([]Transaction, error)
 	SetCacheValue(ctx context.Context, arg SetCacheValueParams) error
+	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) error
+	UpdateTransactionWithStripeData(ctx context.Context, arg UpdateTransactionWithStripeDataParams) error
 }
 
 var _ Querier = (*Queries)(nil)

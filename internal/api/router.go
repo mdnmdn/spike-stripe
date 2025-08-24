@@ -1,22 +1,28 @@
 package api
 
 import (
+	"database/sql"
 	"embed"
 	"io/fs"
 	"net/http"
+	"stripe-go-spike/internal/db"
 	"stripe-go-spike/internal/payments"
 
 	"github.com/gin-gonic/gin"
 )
 
 // NewRouter creates a new Gin router.
-func NewRouter(service *payments.Service, frontendAssets embed.FS) *gin.Engine {
+func NewRouter(service *payments.Service, database *sql.DB, queries *db.Queries, frontendAssets embed.FS) *gin.Engine {
 	r := gin.Default()
-	h := NewHandlers(service) // service is payments.Service
+	h := NewHandlers(service, database, queries)
 
 	api := r.Group("/api")
 	{
 		api.GET("/health", h.Health)
+		api.GET("/products", h.GetProducts)
+		api.GET("/users", h.GetUsers)
+		api.GET("/transactions/:user_id", h.GetUserTransactions)
+		api.GET("/transactions", h.GetAllTransactions)
 		api.POST("/checkout-session", h.CreateCheckoutSession)
 		api.POST("/webhook", h.Webhook)
 	}

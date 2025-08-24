@@ -4,7 +4,24 @@
 
 package db
 
+import (
+	"database/sql"
+)
+
 type Cache struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+type Transaction struct {
+	ID                    string         `json:"id"`
+	UserID                string         `json:"user_id"`
+	ProductID             string         `json:"product_id"`
+	ProductName           string         `json:"product_name"`
+	Amount                int64          `json:"amount"`
+	StripeSessionID       sql.NullString `json:"stripe_session_id"`
+	StripePaymentIntentID sql.NullString `json:"stripe_payment_intent_id"`
+	Status                string         `json:"status"`
+	CreatedAt             string         `json:"created_at"`
+	UpdatedAt             string         `json:"updated_at"`
 }

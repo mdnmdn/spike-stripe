@@ -29,7 +29,17 @@ func main() {
 		log.Printf("migrations applied successfully")
 	}
 
-	// Initialize the payments service (mock for spike)
+	// Initialize database connection
+	database, err := dbpkg.NewConnection()
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	defer database.Close()
+
+	// Create database queries instance
+	queries := dbpkg.New(database)
+
+	// Initialize the payments service
 	payService := payments.NewService(payments.Config{
 		SecretKey:      os.Getenv("STRIPE_SECRET_KEY"),
 		PublishableKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
@@ -37,7 +47,7 @@ func main() {
 	})
 
 	// Create and run the Gin server
-	router := api.NewRouter(payService, frontendAssets)
+	router := api.NewRouter(payService, database, queries, frontendAssets)
 
 	addr := getServerAddr()
 

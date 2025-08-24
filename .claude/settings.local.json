@@ -3,7 +3,10 @@
     "allow": [
       "WebFetch(domain:docs.stripe.com)",
       "WebFetch(domain:stripe.com)",
-      "Bash(go:*)"
+      "Bash(go:*)",
+      "Bash(curl:*)",
+      "Bash(sqlc:*)",
+      "Bash(RUN_MIGRATION=true go run cmd/server/main.go)"
     ],
     "deny": [],
     "ask": []

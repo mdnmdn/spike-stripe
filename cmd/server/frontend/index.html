@@ -3,157 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>pa11y-go-wrapper</title>
+    <title>Stripe Spike - User Selector</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js"></script>
 </head>
-<body><h1>Stripe Go Spike</h1><p>This is a minimal placeholder frontend.</p>
-
-    <div id="app" class="container mx-auto p-4">
-        <h1 class="text-3xl font-bold mb-4">pa11y-go-wrapper</h1>
-
-        <!-- Direct Analysis -->
-        <div class="bg-white p-6 rounded-lg shadow-lg mb-4">
-            <h2 class="text-2xl font-bold mb-4">Direct Analysis</h2>
-            <div class="flex space-x-2">
-                <input v-model="directUrl" type="text" placeholder="https://example.com" class="flex-grow p-2 border rounded-md">
-                <select v-model="runner" class="p-2 border rounded-md">
-                    <option value="htmlcs">htmlcs</option>
-                    <option value="axe">axe</option>
-                </select>
-                <button @click="analyzeUrl" :disabled="directAnalyzing" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 disabled:opacity-50">Analyze</button>
-            </div>
-        </div>
-
-        <!-- Enqueue URL -->
-        <div class="bg-white p-6 rounded-lg shadow-lg mb-4">
-            <h2 class="text-2xl font-bold mb-4">Enqueue URL</h2>
-            <div class="flex space-x-2">
-                <input v-model="enqueueUrl" type="text" placeholder="https://example.com" class="flex-grow p-2 border rounded-md">
-                <button @click="enqueue" class="bg-green-500 text-white p-2 rounded-md hover:bg-green-600">Enqueue</button>
-            </div>
-        </div>
-
-        <!-- Queue -->
-        <div class="bg-white p-6 rounded-lg shadow-lg mb-4">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold">Queue</h2>
-                <button @click="getQueue" class="bg-gray-500 text-white p-2 rounded-md hover:bg-gray-600">Refresh</button>
-            </div>
-            <table class="w-full text-left table-auto">
-                <thead>
-                    <tr>
-                        <th class="px-4 py-2">ID</th>
-                        <th class="px-4 py-2">URL</th>
-                        <th class="px-4 py-2">Status</th>
-                        <th class="px-4 py-2">Duration</th>
-                        <th class="px-4 py-2">Created At</th>
-                        <th class="px-4 py-2">Actions</th>
-                        <th class="px-4 py-2">Reports</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="item in queue" :key="item.id" class="border-t">
-                        <td class="px-4 py-2">{{ item.id }}</td>
-                        <td class="px-4 py-2">{{ item.url }}</td>
-                        <td class="px-4 py-2">
-                            <span :class="statusBadgeClass(item.status)" class="px-2 py-1 rounded text-xs font-semibold">
-                                {{ item.status }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-2">{{ item.durationMs ? formatDuration(item.durationMs) : '-' }}</td>
-                        <td class="px-4 py-2">{{ new Date(item.createdAt).toLocaleString() }}</td>
-                        <td class="px-4 py-2">
-                            <button @click="getQueueItem(item.id)" class="bg-blue-500 text-white p-1 rounded-md hover:bg-blue-600">View</button>
-                        </td>
-                        <td class="px-4 py-2">
-                            <div v-if="item.status === 'completed'">
-                                <a :href="'/api/completed/html?id=' + item.id" target="_blank" class="bg-blue-500 text-white p-1 rounded-md hover:bg-blue-600">HTML</a>
-                                <a :href="'/api/completed/pdf?id=' + item.id" target="_blank" class="bg-red-500 text-white p-1 rounded-md hover:bg-red-600">PDF</a>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Result -->
-        <div v-if="result" class="bg-white p-6 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-bold mb-4">Analysis Result</h2>
-
-            <!-- Loader for direct analyze -->
-            <div v-if="directAnalyzing && (result.status === 'pending' || result.status === 'processing')" class="flex items-center text-blue-600 mb-4">
-                <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-                <span class="ml-2">Analyzing... ({{ result.status }})</span>
-            </div>
-
-            <!-- Tabs -->
-            <div class="border-b mb-4">
-                <nav class="flex space-x-4">
-                    <button @click="activeTab = 'results'" :class="activeTab === 'results' ? 'border-b-2 border-blue-600 text-blue-600 pb-2' : 'text-gray-600 pb-2'" class="px-2">Results</button>
-                    <button @click="activeTab = 'raw'" :class="activeTab === 'raw' ? 'border-b-2 border-blue-600 text-blue-600 pb-2' : 'text-gray-600 pb-2'" class="px-2">Raw</button>
-                </nav>
-            </div>
-
-            <!-- Results Tab -->
-            <div v-show="activeTab === 'results'">
-                <!-- Metadata -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div><span class="font-semibold">ID:</span> {{ result.id }}</div>
-                    <div><span class="font-semibold">URL:</span> {{ result.url }}</div>
-                    <div><span class="font-semibold">Runner:</span> {{ result.runner || 'htmlcs' }}</div>
-                    <div><span class="font-semibold">Status:</span> <span :class="statusBadgeClass(result.status)" class="px-2 py-1 rounded text-xs font-semibold">{{ result.status }}</span></div>
-                    <div><span class="font-semibold">Duration:</span> {{ result.durationMs ? formatDuration(result.durationMs) : '-' }}</div>
-                    <div><span class="font-semibold">Created At:</span> {{ result.createdAt ? new Date(result.createdAt).toLocaleString() : '-' }}</div>
-                    <div><span class="font-semibold">Updated At:</span> {{ result.updatedAt ? new Date(result.updatedAt).toLocaleString() : '-' }}</div>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app">
+        <!-- User Selector Page -->
+        <div v-if="!currentUser" class="flex items-center justify-center min-h-screen">
+            <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">Stripe Spike</h1>
+                    <p class="text-gray-600">Select a user to continue</p>
                 </div>
-
-                <!-- Issues Table -->
-                <div>
-                    <h3 class="text-xl font-bold mb-2">Issues</h3>
-                    <div v-if="!result.result || result.result.length === 0" class="text-green-700">No issues found.</div>
-                    <div v-else class="overflow-x-auto">
-                        <table class="w-full text-left table-auto">
-                            <thead>
-                                <tr class="bg-gray-100">
-                                    <th class="px-4 py-2">Code</th>
-                                    <th class="px-4 py-2">Message</th>
-                                    <th class="px-4 py-2">Type</th>
-                                    <th class="px-4 py-2">Type Code</th>
-                                    <th class="px-4 py-2">Selector</th>
-                                    <th class="px-4 py-2">Context</th>
-                                    <th class="px-4 py-2">Runner</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(issue, idx) in result.result" :key="idx" class="border-t">
-                                    <td class="px-4 py-2">{{ issue.code }}</td>
-                                    <td class="px-4 py-2">{{ issue.message }}</td>
-                                    <td class="px-4 py-2">{{ issue.type }}</td>
-                                    <td class="px-4 py-2">{{ issue.typeCode }}</td>
-                                    <td class="px-4 py-2">{{ issue.selector }}</td>
-                                    <td class="px-4 py-2 truncate max-w-xs" :title="issue.context">{{ issue.context }}</td>
-                                    <td class="px-4 py-2">{{ issue.runner }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                
+                <div class="space-y-4">
+                    <div v-for="user in users" :key="user.id" 
+                         @click="selectUser(user)"
+                         class="p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all duration-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                                     :class="user.role === 'admin' ? 'bg-red-500' : 'bg-blue-500'">
+                                    {{ user.name.charAt(0) }}
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900">{{ user.name }}</h3>
+                                    <p class="text-sm text-gray-500 capitalize">{{ user.role }}</p>
+                                </div>
+                            </div>
+                            <div class="text-gray-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Raw Tab -->
-            <div v-show="activeTab === 'raw'">
-                <pre class="bg-gray-200 p-4 rounded-md overflow-x-auto"><code>{{ JSON.stringify(result, null, 2) }}</code></pre>
-            </div>
+        <!-- User Dashboard -->
+        <div v-else class="min-h-screen">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <h1 class="text-2xl font-bold text-gray-900">Stripe Spike</h1>
+                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                                {{ currentUser.name }}
+                            </span>
+                        </div>
+                        <button @click="logout" 
+                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                            Switch User
+                        </button>
+                    </div>
+                </div>
+            </header>
 
-            <div v-if="result.status === 'completed'" class="mt-4">
-                <h3 class="text-xl font-bold mb-2">Reports</h3>
-                <a :href="'/api/completed/html?id=' + result.id" target="_blank" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 mr-2">View HTML Report</a>
-                <a :href="'/api/completed/pdf?id=' + result.id" target="_blank" class="bg-red-500 text-white p-2 rounded-md hover:bg-red-600">View PDF Report</a>
-            </div>
+            <!-- Admin Dashboard -->
+            <main v-if="currentUser.role === 'admin'" class="container mx-auto px-4 py-8">
+                <!-- Success/Error Messages -->
+                <div v-if="successMessage" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+                    {{ successMessage }}
+                </div>
+                <div v-if="errorMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                    {{ errorMessage }}
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg">
+                    <div class="p-6 border-b">
+                        <h2 class="text-xl font-bold text-gray-900">All Transactions</h2>
+                        <p class="text-gray-600 mt-1">View all user transactions</p>
+                    </div>
+                    <div class="p-6">
+                        <!-- Admin Transactions -->
+                        <div v-if="loading" class="text-center text-gray-500 py-8">
+                            <p>Loading transactions...</p>
+                        </div>
+                        <div v-else-if="allTransactions.length === 0" class="text-center text-gray-500 py-8">
+                            <p>No transactions found</p>
+                        </div>
+                        <div v-else class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">User</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Product</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Amount</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="transaction in allTransactions" :key="transaction.id" class="border-b border-gray-100">
+                                        <td class="py-3 px-4">{{ transaction.user_id }}</td>
+                                        <td class="py-3 px-4">{{ transaction.product_name }}</td>
+                                        <td class="py-3 px-4">${{ (transaction.amount / 100).toFixed(2) }}</td>
+                                        <td class="py-3 px-4">
+                                            <span :class="getStatusClass(transaction.status)" class="px-2 py-1 rounded-full text-xs font-medium">
+                                                {{ transaction.status }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4">{{ formatDate(transaction.created_at) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- User Dashboard -->
+            <main v-else class="container mx-auto px-4 py-8">
+                <!-- Success/Error Messages -->
+                <div v-if="successMessage" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+                    {{ successMessage }}
+                </div>
+                <div v-if="errorMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                    {{ errorMessage }}
+                </div>
+                
+                <!-- Tab Navigation -->
+                <div class="bg-white rounded-lg shadow-lg">
+                    <div class="border-b">
+                        <nav class="flex space-x-8 px-6">
+                            <button @click="activeTab = 'products'" 
+                                    :class="activeTab === 'products' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="py-4 px-1 border-b-2 font-medium text-sm">
+                                Products
+                            </button>
+                            <button @click="activeTab = 'transactions'" 
+                                    :class="activeTab === 'transactions' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="py-4 px-1 border-b-2 font-medium text-sm">
+                                My Transactions
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Products Tab -->
+                    <div v-show="activeTab === 'products'" class="p-6">
+                        <h2 class="text-xl font-bold text-gray-900 mb-6">Available Products</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div v-for="product in products" :key="product.id" 
+                                 class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ product.name }}</h3>
+                                <p class="text-gray-600 mb-4">{{ product.description }}</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-2xl font-bold text-gray-900">${{ (product.price / 100).toFixed(2) }}</span>
+                                    <button @click="buyProduct(product)"
+                                            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                                        Buy with Stripe
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transactions Tab -->
+                    <div v-show="activeTab === 'transactions'" class="p-6">
+                        <h2 class="text-xl font-bold text-gray-900 mb-6">My Transactions</h2>
+                        <!-- User Transactions -->
+                        <div v-if="loading" class="text-center text-gray-500 py-8">
+                            <p>Loading transactions...</p>
+                        </div>
+                        <div v-else-if="userTransactions.length === 0" class="text-center text-gray-500 py-8">
+                            <p>No transactions found</p>
+                        </div>
+                        <div v-else class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Product</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Amount</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="transaction in userTransactions" :key="transaction.id" class="border-b border-gray-100">
+                                        <td class="py-3 px-4">{{ transaction.product_name }}</td>
+                                        <td class="py-3 px-4">${{ (transaction.amount / 100).toFixed(2) }}</td>
+                                        <td class="py-3 px-4">
+                                            <span :class="getStatusClass(transaction.status)" class="px-2 py-1 rounded-full text-xs font-medium">
+                                                {{ transaction.status }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4">{{ formatDate(transaction.created_at) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
 
@@ -161,132 +206,185 @@
         new Vue({
             el: '#app',
             data: {
-                directUrl: '',
-                runner: 'htmlcs',
-                enqueueUrl: '',
-                queue: [],
-                result: null,
-                directAnalyzing: false,
-                activeTab: 'results',
-                pollTimer: null,
+                currentUser: null,
+                activeTab: 'products',
+                users: [],
+                products: [],
+                userTransactions: [],
+                allTransactions: [],
+                loading: false,
+                successMessage: '',
+                errorMessage: ''
             },
             methods: {
-                async analyzeUrl() {
-                    if (!this.directUrl) return;
+                selectUser(user) {
+                    this.currentUser = user;
+                    sessionStorage.setItem('currentUser', JSON.stringify(user));
+                    this.activeTab = 'products';
+                    // Load data for the selected user
+                    this.loadProducts();
+                    if (user.role === 'admin') {
+                        this.loadAllTransactions();
+                    } else {
+                        this.loadUserTransactions(user.id);
+                    }
+                },
+                logout() {
+                    this.currentUser = null;
+                    sessionStorage.removeItem('currentUser');
+                    this.activeTab = 'products';
+                },
+                async buyProduct(product) {
                     try {
-                        // stop any previous polling
-                        this.stopPolling();
-                        this.directAnalyzing = true;
-                        this.activeTab = 'results';
-                        const response = await fetch('/api/analyze', {
+                        const response = await fetch('/api/checkout-session', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ url: this.directUrl, runner: this.runner }),
+                            body: JSON.stringify({ 
+                                user_id: this.currentUser.id,
+                                product_id: product.id 
+                            }),
                         });
-                        const analysis = await response.json();
-                        this.result = analysis;
-                        if (analysis && analysis.id) {
-                            this.startPolling(analysis.id);
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            // Redirect to Stripe Checkout
+                            window.location.href = data.url;
                         } else {
-                            this.directAnalyzing = false;
+                            const errorData = await response.json();
+                            console.error('Failed to create checkout session:', errorData);
+                            alert('Failed to start payment process: ' + (errorData.error || 'Unknown error'));
                         }
                     } catch (error) {
-                        console.error('Error analyzing URL:', error);
-                        this.result = { error: 'Failed to analyze URL' };
-                        this.directAnalyzing = false;
+                        console.error('Error creating checkout session:', error);
+                        alert('Failed to start payment process. Please try again.');
                     }
                 },
-                async enqueue() {
-                    if (!this.enqueueUrl) return;
+                async loadUsers() {
                     try {
-                        const response = await fetch('/api/queue', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ url: this.enqueueUrl }),
-                        });
-                        const newItem = await response.json();
-                        this.queue.push(newItem);
-                        this.enqueueUrl = '';
-                        this.getQueue();
-                    } catch (error) {
-                        console.error('Error enqueuing URL:', error);
-                    }
-                },
-                async getQueue() {
-                    try {
-                        const response = await fetch('/api/queue');
-                        this.queue = await response.json();
-                    } catch (error) {
-                        console.error('Error getting queue:', error);
-                    }
-                },
-                async getQueueItem(id) {
-                    try {
-                        const response = await fetch(`/api/queue/${id}`);
-                        this.result = await response.json();
-                        this.activeTab = 'results';
-                        this.directAnalyzing = false;
-                    } catch (error) {
-                        console.error('Error getting queue item:', error);
-                        this.result = { error: 'Failed to get queue item' };
-                    }
-                },
-                startPolling(id) {
-                    this.stopPolling();
-                    this.pollTimer = setInterval(async () => {
-                        try {
-                            const res = await fetch(`/api/queue/${id}`);
-                            const data = await res.json();
-                            this.result = data;
-                            if (data.status === 'completed' || data.status === 'failed') {
-                                this.stopPolling();
-                                this.directAnalyzing = false;
-                            }
-                        } catch (e) {
-                            console.error('Polling error:', e);
-                            this.stopPolling();
-                            this.directAnalyzing = false;
+                        const response = await fetch('/api/users');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.users = data.users;
                         }
-                    }, 1500);
-                },
-                stopPolling() {
-                    if (this.pollTimer) {
-                        clearInterval(this.pollTimer);
-                        this.pollTimer = null;
+                    } catch (error) {
+                        console.error('Failed to load users:', error);
+                        // Fallback to hardcoded users
+                        this.users = [
+                            { id: 'luke', name: 'Luke', role: 'user' },
+                            { id: 'jinny', name: 'Jinny', role: 'user' },
+                            { id: 'admin', name: 'ADMIN', role: 'admin' }
+                        ];
                     }
                 },
-                formatDuration(ms) {
-                    // Simple human-readable formatter
-                    if (ms == null) return '-';
-                    const s = Math.floor(ms / 1000);
-                    const msR = ms % 1000;
-                    const h = Math.floor(s / 3600);
-                    const m = Math.floor((s % 3600) / 60);
-                    const sec = s % 60;
-                    const parts = [];
-                    if (h) parts.push(h + 'h');
-                    if (m) parts.push(m + 'm');
-                    if (sec || (!h && !m)) parts.push(sec + 's');
-                    if (!h && !m && ms < 1000) parts.push(msR + 'ms');
-                    return parts.join(' ');
+                async loadProducts() {
+                    try {
+                        const response = await fetch('/api/products');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.products = data.products;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load products:', error);
+                        // Fallback to hardcoded products
+                        this.products = [
+                            { id: 'lumaweave', name: 'LumaWeave Reactive Threads', description: 'Smart textile technology', price: 4999 },
+                            { id: 'coffee-pods', name: 'Atmospheric Coffee Pods', description: 'Premium coffee experience', price: 2999 },
+                            { id: 'echospout', name: 'EchoSprout Memory Plants', description: 'Living memory storage', price: 8999 },
+                            { id: 'pocketforge', name: 'PocketForge Nano Printer', description: 'Miniature 3D printing', price: 19999 }
+                        ];
+                    }
                 },
-                statusBadgeClass(status) {
+                async loadUserTransactions(userId) {
+                    this.loading = true;
+                    try {
+                        const response = await fetch(`/api/transactions/${userId}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.userTransactions = data.transactions;
+                        } else {
+                            this.userTransactions = [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to load user transactions:', error);
+                        this.userTransactions = [];
+                    }
+                    this.loading = false;
+                },
+                async loadAllTransactions() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/transactions');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.allTransactions = data.transactions;
+                        } else {
+                            this.allTransactions = [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to load all transactions:', error);
+                        this.allTransactions = [];
+                    }
+                    this.loading = false;
+                },
+                getStatusClass(status) {
                     switch (status) {
-                        case 'completed':
-                            return 'bg-green-100 text-green-800';
-                        case 'failed':
-                        case 'error':
-                            return 'bg-red-100 text-red-800';
-                        case 'processing':
-                            return 'bg-yellow-100 text-yellow-800';
-                        case 'pending':
-                        default:
-                            return 'bg-gray-100 text-gray-800';
+                        case 'completed': return 'bg-green-100 text-green-800';
+                        case 'pending': return 'bg-yellow-100 text-yellow-800';
+                        case 'failed': return 'bg-red-100 text-red-800';
+                        case 'cancelled': return 'bg-gray-100 text-gray-800';
+                        default: return 'bg-gray-100 text-gray-800';
+                    }
+                },
+                formatDate(dateString) {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                },
+                checkPaymentResult() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.get('success') === 'true') {
+                        this.successMessage = 'Payment successful! Thank you for your purchase.';
+                        // Reload transactions to show the updated status
+                        if (this.currentUser) {
+                            if (this.currentUser.role === 'admin') {
+                                this.loadAllTransactions();
+                            } else {
+                                this.loadUserTransactions(this.currentUser.id);
+                            }
+                        }
+                        // Clear URL parameters
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        setTimeout(() => this.successMessage = '', 5000);
+                    } else if (urlParams.get('canceled') === 'true') {
+                        this.errorMessage = 'Payment was cancelled.';
+                        // Clear URL parameters
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        setTimeout(() => this.errorMessage = '', 5000);
                     }
                 }
             },
-            mounted() {
-                this.getQueue();
+            async mounted() {
+                // Load initial data
+                await this.loadUsers();
+                await this.loadProducts();
+                
+                // Check payment result from URL
+                this.checkPaymentResult();
+                
+                // Check if user is stored in session
+                const storedUser = sessionStorage.getItem('currentUser');
+                if (storedUser) {
+                    try {
+                        this.currentUser = JSON.parse(storedUser);
+                        // Load user-specific data
+                        if (this.currentUser.role === 'admin') {
+                            this.loadAllTransactions();
+                        } else {
+                            this.loadUserTransactions(this.currentUser.id);
+                        }
+                    } catch (e) {
+                        sessionStorage.removeItem('currentUser');
+                    }
+                }
             }
         });
     </script>

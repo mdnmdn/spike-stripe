@@ -24,23 +24,49 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.createTransactionStmt, err = db.PrepareContext(ctx, createTransaction); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateTransaction: %w", err)
+	}
 	if q.deleteCacheKeyStmt, err = db.PrepareContext(ctx, deleteCacheKey); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteCacheKey: %w", err)
 	}
 	if q.getCacheValueStmt, err = db.PrepareContext(ctx, getCacheValue); err != nil {
 		return nil, fmt.Errorf("error preparing query GetCacheValue: %w", err)
 	}
+	if q.getTransactionStmt, err = db.PrepareContext(ctx, getTransaction); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTransaction: %w", err)
+	}
+	if q.getTransactionByStripeSessionIDStmt, err = db.PrepareContext(ctx, getTransactionByStripeSessionID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTransactionByStripeSessionID: %w", err)
+	}
+	if q.listAllTransactionsStmt, err = db.PrepareContext(ctx, listAllTransactions); err != nil {
+		return nil, fmt.Errorf("error preparing query ListAllTransactions: %w", err)
+	}
 	if q.listCacheStmt, err = db.PrepareContext(ctx, listCache); err != nil {
 		return nil, fmt.Errorf("error preparing query ListCache: %w", err)
 	}
+	if q.listTransactionsByUserIDStmt, err = db.PrepareContext(ctx, listTransactionsByUserID); err != nil {
+		return nil, fmt.Errorf("error preparing query ListTransactionsByUserID: %w", err)
+	}
 	if q.setCacheValueStmt, err = db.PrepareContext(ctx, setCacheValue); err != nil {
 		return nil, fmt.Errorf("error preparing query SetCacheValue: %w", err)
+	}
+	if q.updateTransactionStatusStmt, err = db.PrepareContext(ctx, updateTransactionStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateTransactionStatus: %w", err)
+	}
+	if q.updateTransactionWithStripeDataStmt, err = db.PrepareContext(ctx, updateTransactionWithStripeData); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateTransactionWithStripeData: %w", err)
 	}
 	return &q, nil
 }
 
 func (q *Queries) Close() error {
 	var err error
+	if q.createTransactionStmt != nil {
+		if cerr := q.createTransactionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createTransactionStmt: %w", cerr)
+		}
+	}
 	if q.deleteCacheKeyStmt != nil {
 		if cerr := q.deleteCacheKeyStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteCacheKeyStmt: %w", cerr)
@@ -51,14 +77,44 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getCacheValueStmt: %w", cerr)
 		}
 	}
+	if q.getTransactionStmt != nil {
+		if cerr := q.getTransactionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTransactionStmt: %w", cerr)
+		}
+	}
+	if q.getTransactionByStripeSessionIDStmt != nil {
+		if cerr := q.getTransactionByStripeSessionIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTransactionByStripeSessionIDStmt: %w", cerr)
+		}
+	}
+	if q.listAllTransactionsStmt != nil {
+		if cerr := q.listAllTransactionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listAllTransactionsStmt: %w", cerr)
+		}
+	}
 	if q.listCacheStmt != nil {
 		if cerr := q.listCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listCacheStmt: %w", cerr)
 		}
 	}
+	if q.listTransactionsByUserIDStmt != nil {
+		if cerr := q.listTransactionsByUserIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listTransactionsByUserIDStmt: %w", cerr)
+		}
+	}
 	if q.setCacheValueStmt != nil {
 		if cerr := q.setCacheValueStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing setCacheValueStmt: %w", cerr)
+		}
+	}
+	if q.updateTransactionStatusStmt != nil {
+		if cerr := q.updateTransactionStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateTransactionStatusStmt: %w", cerr)
+		}
+	}
+	if q.updateTransactionWithStripeDataStmt != nil {
+		if cerr := q.updateTransactionWithStripeDataStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateTransactionWithStripeDataStmt: %w", cerr)
 		}
 	}
 	return err
@@ -98,21 +154,35 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                 DBTX
-	tx                 *sql.Tx
-	deleteCacheKeyStmt *sql.Stmt
-	getCacheValueStmt  *sql.Stmt
-	listCacheStmt      *sql.Stmt
-	setCacheValueStmt  *sql.Stmt
+	db                                  DBTX
+	tx                                  *sql.Tx
+	createTransactionStmt               *sql.Stmt
+	deleteCacheKeyStmt                  *sql.Stmt
+	getCacheValueStmt                   *sql.Stmt
+	getTransactionStmt                  *sql.Stmt
+	getTransactionByStripeSessionIDStmt *sql.Stmt
+	listAllTransactionsStmt             *sql.Stmt
+	listCacheStmt                       *sql.Stmt
+	listTransactionsByUserIDStmt        *sql.Stmt
+	setCacheValueStmt                   *sql.Stmt
+	updateTransactionStatusStmt         *sql.Stmt
+	updateTransactionWithStripeDataStmt *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                 tx,
-		tx:                 tx,
-		deleteCacheKeyStmt: q.deleteCacheKeyStmt,
-		getCacheValueStmt:  q.getCacheValueStmt,
-		listCacheStmt:      q.listCacheStmt,
-		setCacheValueStmt:  q.setCacheValueStmt,
+		db:                                  tx,
+		tx:                                  tx,
+		createTransactionStmt:               q.createTransactionStmt,
+		deleteCacheKeyStmt:                  q.deleteCacheKeyStmt,
+		getCacheValueStmt:                   q.getCacheValueStmt,
+		getTransactionStmt:                  q.getTransactionStmt,
+		getTransactionByStripeSessionIDStmt: q.getTransactionByStripeSessionIDStmt,
+		listAllTransactionsStmt:             q.listAllTransactionsStmt,
+		listCacheStmt:                       q.listCacheStmt,
+		listTransactionsByUserIDStmt:        q.listTransactionsByUserIDStmt,
+		setCacheValueStmt:                   q.setCacheValueStmt,
+		updateTransactionStatusStmt:         q.updateTransactionStatusStmt,
+		updateTransactionWithStripeDataStmt: q.updateTransactionWithStripeDataStmt,
 	}
 }

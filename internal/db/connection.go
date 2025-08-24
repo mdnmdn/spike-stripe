@@ -54,3 +54,24 @@ func NewTursoConnection() (*sql.DB, error) {
 	}
 	return sql.OpenDB(connector), nil
 }
+
+// NewTestConnection creates a new in-memory SQLite connection for testing
+func NewTestConnection() (*sql.DB, error) {
+	dsn := ":memory:"
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	// Run migrations for testing
+	migrations := os.DirFS("../../db/migrations")
+	if err := RunMigrations(db, migrations, ""); err != nil {
+		// Try alternative path for when tests are run from project root
+		migrations = os.DirFS("db/migrations")
+		if err := RunMigrations(db, migrations, ""); err != nil {
+			return nil, fmt.Errorf("failed to run test migrations: %w", err)
+		}
+	}
+
+	return db, nil
+}
