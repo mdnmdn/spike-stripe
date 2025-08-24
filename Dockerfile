@@ -30,6 +30,11 @@ ENV CHROME_BIN=/usr/bin/google-chrome \
 # Copy the built binary from the builder stage
 COPY --from=builder /pa11y-go-server /pa11y-go-server
 
+# Create a non-root user to run the application
+RUN groupadd -r appgroup && useradd -r -g appgroup -ms /bin/bash appuser
+RUN chown -R appuser:appgroup /pa11y-go-server
+USER appuser
+
 # Expose the port the app runs on
 EXPOSE 8080
 
