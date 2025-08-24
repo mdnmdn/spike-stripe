@@ -1,0 +1,29 @@
+name: Deploy to Koyeb
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install and configure the Koyeb CLI
+        uses: koyeb-community/koyeb-actions@v2
+        with:
+          api_token: "${{ secrets.KOYEB_API_TOKEN }}"
+
+      - name: Build and deploy the application to Koyeb
+        uses: koyeb/action-git-deploy@v1
+        with:
+          app-name: "pa11y-go-wrapper"
+          service-name: "pa11y-go-wrapper"
+          git-builder: "buildpack"
+          git-build-command: "go build -o pa11y-go-server cmd/server/main.go"
+          git-run-command: "./pa11y-go-server"
+          service-ports: "8080:http"
+          service-routes: "/:8080"

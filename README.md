@@ -35,6 +35,26 @@ To start the server, run the following command:
 
 The server will start on port 8080.
 
+## Deployment
+
+This application can be deployed to [Koyeb](https://www.koyeb.com/) using the provided GitHub Actions workflow. The workflow will automatically deploy the application whenever you push changes to the `main` branch.
+
+### Prerequisites
+
+Before you can deploy the application, you need to have a [Koyeb](https://www.koyeb.com/) account.
+
+### Setup
+
+1.  **Create a Koyeb API Token:**
+    Go to the [API access tokens settings](https://app.koyeb.com/settings/api) in the Koyeb control panel and generate a new token. Copy the token to your clipboard.
+
+2.  **Add the token to GitHub Secrets:**
+    In your GitHub repository, go to `Settings` > `Secrets and variables` > `Actions`. Create a new repository secret named `KOYEB_API_TOKEN` and paste the token you copied in the previous step.
+
+### Continuous Deployment
+
+Once you have completed the setup, the GitHub Actions workflow in `.github/workflows/koyeb.yml` will automatically deploy your application to Koyeb every time you push a change to the `main` branch. The application will be deployed with the name `pa11y-go-wrapper`.
+
 ## API
 
 The server exposes the following API endpoints:
