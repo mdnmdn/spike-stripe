@@ -21,7 +21,7 @@
                     <option value="htmlcs">htmlcs</option>
                     <option value="axe">axe</option>
                 </select>
-                <button @click="analyzeUrl" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Analyze</button>
+                <button @click="analyzeUrl" :disabled="directAnalyzing" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 disabled:opacity-50">Analyze</button>
             </div>
         </div>
 
@@ -74,10 +74,77 @@
         <!-- Result -->
         <div v-if="result" class="bg-white p-6 rounded-lg shadow-lg">
             <h2 class="text-2xl font-bold mb-4">Analysis Result</h2>
-            <pre class="bg-gray-200 p-4 rounded-md overflow-x-auto"><code>{{ JSON.stringify(result, null, 2) }}</code></pre>
+
+            <!-- Loader for direct analyze -->
+            <div v-if="directAnalyzing && (result.status === 'pending' || result.status === 'processing')" class="flex items-center text-blue-600 mb-4">
+                <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <span class="ml-2">Analyzing... ({{ result.status }})</span>
+            </div>
+
+            <!-- Tabs -->
+            <div class="border-b mb-4">
+                <nav class="flex space-x-4">
+                    <button @click="activeTab = 'results'" :class="activeTab === 'results' ? 'border-b-2 border-blue-600 text-blue-600 pb-2' : 'text-gray-600 pb-2'" class="px-2">Results</button>
+                    <button @click="activeTab = 'raw'" :class="activeTab === 'raw' ? 'border-b-2 border-blue-600 text-blue-600 pb-2' : 'text-gray-600 pb-2'" class="px-2">Raw</button>
+                </nav>
+            </div>
+
+            <!-- Results Tab -->
+            <div v-show="activeTab === 'results'">
+                <!-- Metadata -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div><span class="font-semibold">ID:</span> {{ result.id }}</div>
+                    <div><span class="font-semibold">URL:</span> {{ result.url }}</div>
+                    <div><span class="font-semibold">Runner:</span> {{ result.runner || 'htmlcs' }}</div>
+                    <div><span class="font-semibold">Status:</span> {{ result.status }}</div>
+                    <div><span class="font-semibold">Created At:</span> {{ result.createdAt ? new Date(result.createdAt).toLocaleString() : '-' }}</div>
+                    <div><span class="font-semibold">Updated At:</span> {{ result.updatedAt ? new Date(result.updatedAt).toLocaleString() : '-' }}</div>
+                </div>
+
+                <!-- Issues Table -->
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Issues</h3>
+                    <div v-if="!result.result || result.result.length === 0" class="text-green-700">No issues found.</div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="w-full text-left table-auto">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-4 py-2">Code</th>
+                                    <th class="px-4 py-2">Message</th>
+                                    <th class="px-4 py-2">Type</th>
+                                    <th class="px-4 py-2">Type Code</th>
+                                    <th class="px-4 py-2">Selector</th>
+                                    <th class="px-4 py-2">Context</th>
+                                    <th class="px-4 py-2">Runner</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(issue, idx) in result.result" :key="idx" class="border-t">
+                                    <td class="px-4 py-2">{{ issue.code }}</td>
+                                    <td class="px-4 py-2">{{ issue.message }}</td>
+                                    <td class="px-4 py-2">{{ issue.type }}</td>
+                                    <td class="px-4 py-2">{{ issue.typeCode }}</td>
+                                    <td class="px-4 py-2">{{ issue.selector }}</td>
+                                    <td class="px-4 py-2 truncate max-w-xs" :title="issue.context">{{ issue.context }}</td>
+                                    <td class="px-4 py-2">{{ issue.runner }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw Tab -->
+            <div v-show="activeTab === 'raw'">
+                <pre class="bg-gray-200 p-4 rounded-md overflow-x-auto"><code>{{ JSON.stringify(result, null, 2) }}</code></pre>
+            </div>
+
             <div v-if="result.status === 'completed'" class="mt-4">
                 <h3 class="text-xl font-bold mb-2">Reports</h3>
-                <a :href="'/api/completed/html?id=' + result.id" target="_blank" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">View HTML Report</a>
+                <a :href="'/api/completed/html?id=' + result.id" target="_blank" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 mr-2">View HTML Report</a>
                 <a :href="'/api/completed/pdf?id=' + result.id" target="_blank" class="bg-red-500 text-white p-2 rounded-md hover:bg-red-600">View PDF Report</a>
             </div>
         </div>
@@ -92,20 +159,34 @@
                 enqueueUrl: '',
                 queue: [],
                 result: null,
+                directAnalyzing: false,
+                activeTab: 'results',
+                pollTimer: null,
             },
             methods: {
                 async analyzeUrl() {
                     if (!this.directUrl) return;
                     try {
+                        // stop any previous polling
+                        this.stopPolling();
+                        this.directAnalyzing = true;
+                        this.activeTab = 'results';
                         const response = await fetch('/api/analyze', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ url: this.directUrl, runner: this.runner }),
                         });
-                        this.result = await response.json();
+                        const analysis = await response.json();
+                        this.result = analysis;
+                        if (analysis && analysis.id) {
+                            this.startPolling(analysis.id);
+                        } else {
+                            this.directAnalyzing = false;
+                        }
                     } catch (error) {
                         console.error('Error analyzing URL:', error);
                         this.result = { error: 'Failed to analyze URL' };
+                        this.directAnalyzing = false;
                     }
                 },
                 async enqueue() {
@@ -136,9 +217,35 @@
                     try {
                         const response = await fetch(`/api/queue/${id}`);
                         this.result = await response.json();
+                        this.activeTab = 'results';
+                        this.directAnalyzing = false;
                     } catch (error) {
                         console.error('Error getting queue item:', error);
                         this.result = { error: 'Failed to get queue item' };
+                    }
+                },
+                startPolling(id) {
+                    this.stopPolling();
+                    this.pollTimer = setInterval(async () => {
+                        try {
+                            const res = await fetch(`/api/queue/${id}`);
+                            const data = await res.json();
+                            this.result = data;
+                            if (data.status === 'completed' || data.status === 'failed') {
+                                this.stopPolling();
+                                this.directAnalyzing = false;
+                            }
+                        } catch (e) {
+                            console.error('Polling error:', e);
+                            this.stopPolling();
+                            this.directAnalyzing = false;
+                        }
+                    }, 1500);
+                },
+                stopPolling() {
+                    if (this.pollTimer) {
+                        clearInterval(this.pollTimer);
+                        this.pollTimer = null;
                     }
                 }
             },

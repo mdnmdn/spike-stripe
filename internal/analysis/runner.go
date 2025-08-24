@@ -83,8 +83,8 @@ func (w *Worker) Start() {
 
 			w.service.UpdateStatus(analysis.ID, StatusProcessing)
 
-			// for now, we'll use the default runner
-			result, err := RunPa11y(analysis.URL, "")
+			// Use the specified runner if provided; RunPa11y defaults to htmlcs when empty
+			result, err := RunPa11y(analysis.URL, analysis.Runner)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error running pa11y for %s: %v\n", analysis.URL, err)
 				w.service.UpdateResult(analysis.ID, StatusFailed, nil)

@@ -18,6 +18,7 @@ RUN go build -o /pa11y-go-server cmd/server/main.go
 # Stage 2: Create the final image
 FROM timbru31/node-chrome:20-slim
 
+RUN apt-get update && apt-get install -y libglib2.0-dev
 # Install pa11y globally
 RUN npm install -g pa11y
 

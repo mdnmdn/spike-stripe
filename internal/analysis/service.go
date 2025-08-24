@@ -37,6 +37,7 @@ type Issue struct {
 type Analysis struct {
 	ID        string         `json:"id"`
 	URL       string         `json:"url"`
+	Runner    string         `json:"runner,omitempty"`
 	Status    AnalysisStatus `json:"status"`
 	Result    []Issue        `json:"result,omitempty"`
 	CreatedAt time.Time      `json:"createdAt"`
@@ -59,7 +60,7 @@ func NewService(queueSize int) *Service {
 }
 
 // Create new analysis task and add it to the queue.
-func (s *Service) Create(url string) *Analysis {
+func (s *Service) Create(url string, runner string) *Analysis {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -67,6 +68,7 @@ func (s *Service) Create(url string) *Analysis {
 	analysis := &Analysis{
 		ID:        id,
 		URL:       url,
+		Runner:    runner,
 		Status:    StatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),

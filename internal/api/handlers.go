@@ -31,13 +31,8 @@ func (h *Handlers) AnalyzeURL(c *gin.Context) {
 		return
 	}
 
-	result, err := analysis.RunPa11y(req.URL, req.Runner)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, result)
+	a := h.service.Create(req.URL, req.Runner)
+	c.JSON(http.StatusAccepted, a)
 }
 
 // QueueURLRequest represents the request body for the /queue endpoint.
@@ -53,7 +48,7 @@ func (h *Handlers) QueueURL(c *gin.Context) {
 		return
 	}
 
-	analysis := h.service.Create(req.URL)
+	analysis := h.service.Create(req.URL, "")
 	c.JSON(http.StatusAccepted, analysis)
 }
 
