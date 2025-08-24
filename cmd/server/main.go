@@ -1,10 +1,14 @@
 package main
 
 import (
+	"embed"
 	"log"
 	"pa11y-go-wrapper/internal/analysis"
 	"pa11y-go-wrapper/internal/api"
 )
+
+//go:embed frontend
+var frontendAssets embed.FS
 
 func main() {
 	// Initialize the analysis service
@@ -15,7 +19,7 @@ func main() {
 	worker.Start()
 
 	// Create and run the Gin server
-	router := api.NewRouter(analysisService)
+	router := api.NewRouter(analysisService, frontendAssets)
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}

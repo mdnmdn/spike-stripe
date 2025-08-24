@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pa11y-go-wrapper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-4">pa11y-go-wrapper</h1>
+
+        <!-- Direct Analysis -->
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-4">
+            <h2 class="text-2xl font-bold mb-4">Direct Analysis</h2>
+            <div class="flex space-x-2">
+                <input v-model="directUrl" type="text" placeholder="https://example.com" class="flex-grow p-2 border rounded-md">
+                <select v-model="runner" class="p-2 border rounded-md">
+                    <option value="htmlcs">htmlcs</option>
+                    <option value="axe">axe</option>
+                </select>
+                <button @click="analyzeUrl" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Analyze</button>
+            </div>
+        </div>
+
+        <!-- Enqueue URL -->
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-4">
+            <h2 class="text-2xl font-bold mb-4">Enqueue URL</h2>
+            <div class="flex space-x-2">
+                <input v-model="enqueueUrl" type="text" placeholder="https://example.com" class="flex-grow p-2 border rounded-md">
+                <button @click="enqueue" class="bg-green-500 text-white p-2 rounded-md hover:bg-green-600">Enqueue</button>
+            </div>
+        </div>
+
+        <!-- Queue -->
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Queue</h2>
+                <button @click="getQueue" class="bg-gray-500 text-white p-2 rounded-md hover:bg-gray-600">Refresh</button>
+            </div>
+            <table class="w-full text-left table-auto">
+                <thead>
+                    <tr>
+                        <th class="px-4 py-2">ID</th>
+                        <th class="px-4 py-2">URL</th>
+                        <th class="px-4 py-2">Status</th>
+                        <th class="px-4 py-2">Created At</th>
+                        <th class="px-4 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="item in queue" :key="item.id" class="border-t">
+                        <td class="px-4 py-2">{{ item.id }}</td>
+                        <td class="px-4 py-2">{{ item.url }}</td>
+                        <td class="px-4 py-2">{{ item.status }}</td>
+                        <td class="px-4 py-2">{{ new Date(item.createdAt).toLocaleString() }}</td>
+                        <td class="px-4 py-2">
+                            <button @click="getQueueItem(item.id)" class="bg-blue-500 text-white p-1 rounded-md hover:bg-blue-600">View</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Result -->
+        <div v-if="result" class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-bold mb-4">Analysis Result</h2>
+            <pre class="bg-gray-200 p-4 rounded-md overflow-x-auto"><code>{{ JSON.stringify(result, null, 2) }}</code></pre>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                directUrl: '',
+                runner: 'htmlcs',
+                enqueueUrl: '',
+                queue: [],
+                result: null,
+            },
+            methods: {
+                async analyzeUrl() {
+                    if (!this.directUrl) return;
+                    try {
+                        const response = await fetch('/api/analyze', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: this.directUrl, runner: this.runner }),
+                        });
+                        this.result = await response.json();
+                    } catch (error) {
+                        console.error('Error analyzing URL:', error);
+                        this.result = { error: 'Failed to analyze URL' };
+                    }
+                },
+                async enqueue() {
+                    if (!this.enqueueUrl) return;
+                    try {
+                        const response = await fetch('/api/queue', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: this.enqueueUrl }),
+                        });
+                        const newItem = await response.json();
+                        this.queue.push(newItem);
+                        this.enqueueUrl = '';
+                        this.getQueue();
+                    } catch (error) {
+                        console.error('Error enqueuing URL:', error);
+                    }
+                },
+                async getQueue() {
+                    try {
+                        const response = await fetch('/api/queue');
+                        this.queue = await response.json();
+                    } catch (error) {
+                        console.error('Error getting queue:', error);
+                    }
+                },
+                async getQueueItem(id) {
+                    try {
+                        const response = await fetch(`/api/queue/${id}`);
+                        this.result = await response.json();
+                    } catch (error) {
+                        console.error('Error getting queue item:', error);
+                        this.result = { error: 'Failed to get queue item' };
+                    }
+                }
+            },
+            mounted() {
+                this.getQueue();
+            }
+        });
+    </script>
+</body>
+</html>

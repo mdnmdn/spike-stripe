@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+pa11y-go-wrapper
 
 # Test binary, built with `go test -c`
 *.test
