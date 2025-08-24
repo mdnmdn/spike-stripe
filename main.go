@@ -2,17 +2,33 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go <url>")
+	checkInstall := flag.Bool("check-install", false, "Check if pa11y is installed correctly")
+	flag.Parse()
+
+	if *checkInstall {
+		_, err := exec.LookPath("pa11y")
+		if err != nil {
+			fmt.Println("Error: pa11y is not installed or not in your PATH.")
+			fmt.Println("Please install pa11y by following the instructions at https://github.com/pa11y/pa11y")
+			os.Exit(1)
+		}
+		fmt.Println("pa11y is installed and ready to use.")
+		os.Exit(0)
+	}
+
+	if len(flag.Args()) < 1 {
+		fmt.Println("Usage: pa11y-go-wrapper <url>")
+		fmt.Println("Use --help for more options.")
 		os.Exit(1)
 	}
-	url := os.Args[1]
+	url := flag.Args()[0]
 
 	cmd := exec.Command("pa11y", "--reporter", "json", url)
 	output, err := cmd.CombinedOutput()
