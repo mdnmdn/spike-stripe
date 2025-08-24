@@ -12,13 +12,19 @@ RUN go mod download
 COPY . .
 
 # Build the application
+ENV CGO_ENABLED=0
 RUN go build -o /pa11y-go-server cmd/server/main.go
 
 # Stage 2: Create the final image
-FROM node:20-slim
+FROM timbru31/node-chrome:20-slim
 
 # Install pa11y globally
 RUN npm install -g pa11y
+
+# Ensure pa11y/puppeteer can find Chrome
+ENV CHROME_BIN=/usr/bin/google-chrome \
+    CHROME_PATH=/usr/bin/google-chrome \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 
 # Copy the built binary from the builder stage
 COPY --from=builder /pa11y-go-server /pa11y-go-server

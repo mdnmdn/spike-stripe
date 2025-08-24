@@ -21,12 +21,24 @@ const (
 	StatusFailed AnalysisStatus = "failed"
 )
 
+// Issue represents a single accessibility issue.
+type Issue struct {
+	Code         string                 `json:"code"`
+	Context      string                 `json:"context"`
+	Message      string                 `json:"message"`
+	Runner       string                 `json:"runner"`
+	RunnerExtras map[string]interface{} `json:"runnerExtras"`
+	Selector     string                 `json:"selector"`
+	Type         string                 `json:"type"`
+	TypeCode     int                    `json:"typeCode"`
+}
+
 // Analysis represents a single analysis task.
 type Analysis struct {
 	ID        string         `json:"id"`
 	URL       string         `json:"url"`
 	Status    AnalysisStatus `json:"status"`
-	Result    interface{}    `json:"result,omitempty"`
+	Result    []Issue        `json:"result,omitempty"`
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`
 }
@@ -117,7 +129,7 @@ func (s *Service) UpdateStatus(id string, status AnalysisStatus) {
 }
 
 // UpdateResult updates the result of an analysis task.
-func (s *Service) UpdateResult(id string, status AnalysisStatus, result interface{}) {
+func (s *Service) UpdateResult(id string, status AnalysisStatus, result []Issue) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

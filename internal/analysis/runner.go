@@ -5,14 +5,36 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // RunPa11y executes the pa11y command and returns the result.
-func RunPa11y(url string, runner string) (interface{}, error) {
+func RunPa11y(url string, runner string) ([]Issue, error) {
 	if runner == "" {
 		runner = "htmlcs"
 	}
-	cmd := exec.Command("pa11y", "--reporter", "json", "--runner", runner, url)
+
+	// Determine the pa11y command to run, allowing override via PA11Y_COMMAND (e.g., "npx pa11y").
+	pa11yCmd := os.Getenv("PA11Y_COMMAND")
+	if strings.TrimSpace(pa11yCmd) == "" {
+		pa11yCmd = "pa11y"
+	}
+	parts := strings.Fields(pa11yCmd)
+	var execName string
+	var baseArgs []string
+	if len(parts) > 0 {
+		execName = parts[0]
+		if len(parts) > 1 {
+			baseArgs = parts[1:]
+		}
+	} else {
+		execName = "pa11y"
+	}
+
+	args := append([]string{}, baseArgs...)
+	args = append(args, "--reporter", "json", "--runner", runner, url)
+
+	cmd := exec.Command(execName, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// pa11y exits with code 2 if there are accessibility issues.
@@ -27,7 +49,7 @@ func RunPa11y(url string, runner string) (interface{}, error) {
 		}
 	}
 
-	var result interface{}
+	var result []Issue
 	err = json.Unmarshal(output, &result)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling pa11y output: %v\nOutput was: %s", err, output)
@@ -65,7 +87,7 @@ func (w *Worker) Start() {
 			result, err := RunPa11y(analysis.URL, "")
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error running pa11y for %s: %v\n", analysis.URL, err)
-				w.service.UpdateResult(analysis.ID, StatusFailed, map[string]string{"error": err.Error()})
+				w.service.UpdateResult(analysis.ID, StatusFailed, nil)
 				continue
 			}
 
