@@ -1,0 +1,121 @@
+openapi: 3.0.0
+info:
+  title: pa11y-go-wrapper API
+  description: An API server that wraps the pa11y accessibility analyzer.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+paths:
+  /analyze:
+    post:
+      summary: Performs a direct (synchronous) analysis of a URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: The URL to analyze.
+                  example: https://example.com
+                runner:
+                  type: string
+                  description: The test runner to use (e.g., htmlcs, axe).
+                  example: htmlcs
+              required:
+                - url
+      responses:
+        '200':
+          description: The JSON output from pa11y.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Bad request.
+        '500':
+          description: Internal server error.
+  /queue:
+    post:
+      summary: Adds a URL to the analysis queue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: The URL to add to the queue.
+                  example: https://example.com
+              required:
+                - url
+      responses:
+        '202':
+          description: The newly created analysis task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analysis'
+        '400':
+          description: Bad request.
+    get:
+      summary: Lists all analysis tasks and their statuses.
+      responses:
+        '200':
+          description: A JSON array of analysis tasks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Analysis'
+  /queue/{id}:
+    get:
+      summary: Retrieves the details and analysis result of a specific task.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the analysis task.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The analysis task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analysis'
+        '404':
+          description: Analysis not found.
+
+components:
+  schemas:
+    Analysis:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the analysis task.
+        url:
+          type: string
+          description: The URL being analyzed.
+        status:
+          type: string
+          description: The current status of the analysis.
+          enum: [pending, processing, completed, failed]
+        result:
+          type: object
+          description: The pa11y analysis result. This will be present only when the status is 'completed'.
+        createdAt:
+          type: string
+          format: date-time
+          description: The timestamp when the task was created.
+        updatedAt:
+          type: string
+          format: date-time
+          description: The timestamp when the task was last updated.
