@@ -25,9 +25,15 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# dotenv files
 .env
+.env.*
+!.env.example
+
+# sqlite data
+_data/*.sqlite3
 
 # Editor/IDE
 .idea/
 .vscode/
+_data/

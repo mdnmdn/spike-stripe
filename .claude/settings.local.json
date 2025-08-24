@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.stripe.com)",
+      "WebFetch(domain:stripe.com)",
+      "Bash(go:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
