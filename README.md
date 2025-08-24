@@ -45,13 +45,23 @@ If `pa11y` is not installed or not in your PATH, you will see an error message.
 
 ### Analyzing a web page
 
-To analyze a web page for accessibility issues, simply provide the URL as a command-line argument:
+To analyze a web page for accessibility issues, provide the URL as a command-line argument.
 
 ```bash
 ./pa11y-go-wrapper https://example.com
 ```
 
-The tool will run `pa11y` and print a JSON report of the accessibility issues found on the page.
+By default, the `htmlcs` runner is used. You can specify a different runner using the `--runner` flag.
+
+#### Using the axe runner
+
+To use the `axe` runner, use the `--runner=axe` flag:
+
+```bash
+./pa11y-go-wrapper --runner=axe https://example.com
+```
+
+The tool will run `pa11y` with the specified runner and print a JSON report of the accessibility issues found on the page.
 
 ## Dependencies
 

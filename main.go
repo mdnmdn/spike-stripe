@@ -10,6 +10,7 @@ import (
 
 func main() {
 	checkInstall := flag.Bool("check-install", false, "Check if pa11y is installed correctly")
+	runner := flag.String("runner", "htmlcs", "The test runner to use (e.g., htmlcs, axe)")
 	flag.Parse()
 
 	if *checkInstall {
@@ -24,13 +25,13 @@ func main() {
 	}
 
 	if len(flag.Args()) < 1 {
-		fmt.Println("Usage: pa11y-go-wrapper <url>")
+		fmt.Println("Usage: pa11y-go-wrapper [options] <url>")
 		fmt.Println("Use --help for more options.")
 		os.Exit(1)
 	}
 	url := flag.Args()[0]
 
-	cmd := exec.Command("pa11y", "--reporter", "json", url)
+	cmd := exec.Command("pa11y", "--reporter", "json", "--runner", *runner, url)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// pa11y exits with code 2 if there are accessibility issues.
