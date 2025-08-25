@@ -23,7 +23,7 @@ The Stripe Go Spike is a complete Go HTTP API for prototyping Stripe payment int
 - Role-based view switching (admin vs regular users)
 - Header with current user display and logout functionality
 - Tabbed interface for regular users (Products, My Transactions)
-- Single-view interface for admin users (All Transactions)
+- Admin interface with tabs (All Transactions, Audits)
 
 **Product Display:**
 - Grid layout showing 4 products with descriptions and prices
@@ -62,7 +62,7 @@ The Stripe Go Spike is a complete Go HTTP API for prototyping Stripe payment int
 - All transactions (admin): `GET /api/transactions`
 - Checkout session creation: `POST /api/checkout-session`
 - Webhook handling: `POST /api/webhook`
-- Audit events query: `GET /api/audit-events`
+- Audit events query: `GET /api/audit-events` (used by admin Audits tab)
 
 **Payment Service Layer (`internal/payments/service.go`):**
 - Full Stripe integration with fallback to mock mode
@@ -109,14 +109,15 @@ CREATE TABLE transactions (
 
 **Complete Stripe Features:**
 - Real Stripe Checkout session creation with proper metadata
+- **Payment Intent ID extraction and storage** in transactions table
 - Webhook signature verification and event processing
-- Payment intent handling for status updates
+- Payment intent handling for status updates with full correlation
 - Success/cancel URL configuration
 - Automatic transaction status updates via webhooks
 - Support for multiple Stripe events:
-    - `checkout.session.completed`
-    - `payment_intent.succeeded`
-    - `payment_intent.payment_failed`
+    - `checkout.session.completed` (with payment intent correlation)
+    - `payment_intent.succeeded` (with direct payment intent updates)
+    - `payment_intent.payment_failed` (with direct payment intent updates)
     - `checkout.session.expired`
 
 **Dual Mode Operation:**
@@ -140,12 +141,17 @@ CREATE TABLE audit_events (
     event_type TEXT NOT NULL,         -- e.g., 'webhook.received', 'transaction.created'
     user_id TEXT,                     -- user identifier (nullable)
     information TEXT,                 -- human-readable description
-    payload TEXT                      -- JSON data (nullable)
+    payload TEXT,                     -- JSON data (nullable)
+    ref_id TEXT,                      -- primary reference ID (e.g., payment_intent_id)
+    ref_id2 TEXT                      -- secondary reference ID (e.g., session_id)
 );
 ```
 
 **Audit Service Layer:**
 - Service pattern with convenience methods: `LogStripe()`, `LogPayment()`, `LogSystem()`
+- **Enhanced methods with reference correlation**: `LogStripeWithRefs()`, `LogPaymentWithRefs()`
+- **Payment Intent ID correlation** - `ref_id` stores payment intent IDs (`pi_...`)
+- **Session ID correlation** - `ref_id2` stores Stripe session IDs (`cs_...`)
 - Automatic JSON marshaling of event payloads
 - Type-safe database operations using SQLc
 - Error handling that doesn't break main application flow
@@ -154,20 +160,22 @@ CREATE TABLE audit_events (
 
 *Stripe Subsystem:*
 - `webhook.received` - Raw webhook data including body, signature, full payload
-- `webhook.processed` - Successful processing with event type details
+- `webhook.processed` - Successful processing with event type details **+ payment intent/session correlation**
 - `webhook.processing_failed` - Processing errors with failure details
-- `checkout_session.completed` - Session completion events
+- `checkout_session.completed` - Session completion events **+ payment intent/session correlation**
 - `checkout_session.failed` - Session creation failures
 
 *Payment Subsystem:*
-- `transaction.created` - Transaction metadata at creation time (user, product, amount)
-- `transaction.completed` - Database update success after webhook
-- `transaction.update_failed` - Database update failures with error details
+- `transaction.created` - Transaction metadata at creation time **+ payment intent/session correlation**
+- `transaction.completed` - Database update success after webhook **+ payment intent/session correlation**
+- `transaction.failed` - Transaction marked as failed **+ payment intent correlation**
+- `transaction.update_failed` - Database update failures **+ payment intent/session correlation**
 
 **API Query Endpoint:**
-- `GET /api/audit-events` - Query audit events with filtering and pagination
+- `GET /api/audit-events` - Query audit events with filtering and pagination; default lists most recent first; frontend formats payload JSON in details panel
 - Query parameters: `subsystem`, `event_type`, `user_id`, `limit`, `offset`
-- JSON response format with complete event details including parsed payloads
+- **New correlation parameters**: `ref_id` (payment intent ID), `ref_id2` (session ID)
+- JSON response format with complete event details including parsed payloads and reference IDs
 
 #### 6. Data Management (`internal/data/`)
 
@@ -313,7 +321,10 @@ go test ./...
 ### Audit Endpoints
 - `GET /api/audit-events` - Query audit events with optional filtering
   - Query parameters: `subsystem`, `event_type`, `user_id`, `limit`, `offset`
+  - **New correlation parameters**: `ref_id` (payment intent ID), `ref_id2` (session ID)
   - Example: `/api/audit-events?subsystem=stripe&event_type=webhook.received&limit=10`
+  - **Correlation example**: `/api/audit-events?ref_id=pi_1234567890` (all events for payment intent)
+  - **Session correlation**: `/api/audit-events?ref_id2=cs_test_1234567890` (all events for session)
 
 ### Request/Response Examples
 
@@ -348,27 +359,37 @@ curl "http://localhost:8060/api/audit-events?subsystem=payment&limit=3"
       "event_type": "transaction.created",
       "user_id": "luke",
       "information": "Transaction created for checkout session",
-      "payload": "{\"amount\":4999,\"currency\":\"usd\",\"product_id\":\"lumaweave\",\"product_name\":\"LumaWeave Reactive Threads\",\"transaction_id\":\"d9ca4b0c-2b65-4c31-91dc-1144d8b0c67d\",\"user_id\":\"luke\"}"
+      "payload": "{\"amount\":4999,\"currency\":\"usd\",\"product_id\":\"lumaweave\",\"product_name\":\"LumaWeave Reactive Threads\",\"transaction_id\":\"d9ca4b0c-2b65-4c31-91dc-1144d8b0c67d\",\"user_id\":\"luke\"}",
+      "ref_id": "pi_1234567890abcdef",
+      "ref_id2": "cs_test_1234567890abcdef"
     }
   ]
 }
 ```
 
+**Query by Payment Intent ID:**
+```bash
+curl "http://localhost:8060/api/audit-events?ref_id=pi_1234567890abcdef"
+```
+*Returns all audit events correlated to the specific payment intent across the entire payment lifecycle.*
+
 ## Features Completed
 
 ### ✅ Complete Payment Flow
 1. User selects product from dynamically loaded list
-2. System creates transaction record in database
+2. System creates transaction record in database **with payment intent ID extraction**
 3. Real Stripe checkout session created with proper metadata
 4. User redirected to Stripe Checkout page
-5. Webhook processes payment events and updates transaction status
+5. Webhook processes payment events and updates transaction status **using payment intent correlation**
 6. User sees updated transaction status in real-time
+7. **Complete audit trail with payment intent correlation across all events**
 
 ### ✅ Database Persistence
-- All transactions stored in SQLite database
+- All transactions stored in SQLite database **with payment intent ID storage**
 - Support for Turso cloud database
 - Type-safe database operations using SQLc
 - Automatic migrations on startup
+- **Enhanced audit events table with reference ID correlation**
 
 ### ✅ Dual Operation Mode
 - **Production Mode**: Real Stripe integration with actual payments
@@ -386,11 +407,14 @@ curl "http://localhost:8060/api/audit-events?subsystem=payment&limit=3"
 
 ### ✅ Comprehensive Audit System
 - Complete event logging for all system operations
+- **Payment Intent ID correlation across entire payment lifecycle**
 - Automatic audit trail from transaction creation to webhook processing
-- Structured JSON payload storage for detailed event information
-- Query API with filtering by subsystem, event type, user, and time
+- Structured JSON payload storage with reference ID correlation
+- **Enhanced query API with payment intent and session ID filtering**
+- Query API with filtering by subsystem, event type, user, time, and **reference IDs**
 - Real-time monitoring and debugging capabilities
 - Full webhook payload logging including raw Stripe data
+- **Complete traceability**: Track all events for a specific payment using `ref_id=pi_...`
 
 ### ✅ Testing Infrastructure
 - Complete test suite for API endpoints
@@ -406,6 +430,7 @@ curl "http://localhost:8060/api/audit-events?subsystem=payment&limit=3"
 4. **Clean Architecture**: Proper separation of concerns between layers
 5. **Production Ready**: Docker support, proper error handling, and logging
 6. **Developer Friendly**: Mock mode for development, comprehensive documentation
+7. **Complete Payment Correlation**: Full payment intent ID tracking across all systems
 
 ## Current Capabilities
 
@@ -414,6 +439,28 @@ curl "http://localhost:8060/api/audit-events?subsystem=payment&limit=3"
 3. ✅ **Complete Error Handling**: Comprehensive error handling at all layers
 4. ✅ **User Authentication**: Session-based user selection (suitable for prototyping)
 5. ✅ **Real-time Updates**: Transaction status updates via webhooks
-6. ✅ **Comprehensive Audit Logging**: Full event tracking and monitoring system
+6. ✅ **Comprehensive Audit Logging**: Full event tracking with payment intent correlation system
+7. ✅ **Payment Intent Correlation**: Complete traceability across payment lifecycle
 
-This implementation provides a complete, production-ready Stripe payment integration spike with comprehensive database persistence, real-time updates, and a polished user interface. The system successfully handles the complete payment lifecycle from product selection to payment completion and status updates.
+This implementation provides a complete, production-ready Stripe payment integration spike with comprehensive database persistence, real-time updates, and a polished user interface. The system successfully handles the complete payment lifecycle from product selection to payment completion and status updates, with full payment intent ID correlation enabling complete traceability of payment events across all subsystems.
+
+## New Payment Intent Correlation Features
+
+### ✅ Payment Intent ID Extraction and Storage
+- **Checkout Session Creation**: Extracts `payment_intent_id` from Stripe response (real and mock)
+- **Transaction Storage**: Stores payment intent ID in `stripe_payment_intent_id` column
+- **Webhook Processing**: Extracts payment intent ID from all relevant webhook events
+
+### ✅ Enhanced Audit System with Reference Correlation
+- **Reference Fields**: `ref_id` (payment intent ID) and `ref_id2` (session ID) in audit events
+- **Correlation Methods**: `LogStripeWithRefs()` and `LogPaymentWithRefs()` for correlated logging
+- **Query Capabilities**: Filter audit events by payment intent ID or session ID
+- **Complete Traceability**: Track entire payment lifecycle using single payment intent ID
+
+### ✅ Webhook Event Correlation
+- **Session Completed**: Updates transactions using payment intent ID correlation
+- **Payment Intent Succeeded**: Direct payment intent ID-based transaction updates
+- **Payment Intent Failed**: Direct payment intent ID-based failure marking
+- **All Events Logged**: With payment intent and session ID references for complete correlation
+
+This enhanced implementation ensures that every payment can be fully traced through the system using its Stripe payment intent ID, providing unprecedented visibility into the payment processing pipeline.

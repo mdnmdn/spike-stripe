@@ -74,43 +74,131 @@
                 </div>
                 
                 <div class="bg-white rounded-lg shadow-lg">
-                    <div class="p-6 border-b">
-                        <h2 class="text-xl font-bold text-gray-900">All Transactions</h2>
-                        <p class="text-gray-600 mt-1">View all user transactions</p>
+                    <!-- Admin Tabs -->
+                    <div class="border-b">
+                        <nav class="flex space-x-8 px-6">
+                            <button @click="activeAdminTab = 'transactions'" 
+                                    :class="activeAdminTab === 'transactions' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="py-4 px-1 border-b-2 font-medium text-sm">
+                                Transactions
+                            </button>
+                            <button @click="activeAdminTab = 'audits'"
+                                    :class="activeAdminTab === 'audits' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="py-4 px-1 border-b-2 font-medium text-sm">
+                                Audits
+                            </button>
+                        </nav>
                     </div>
-                    <div class="p-6">
-                        <!-- Admin Transactions -->
-                        <div v-if="loading" class="text-center text-gray-500 py-8">
-                            <p>Loading transactions...</p>
+
+                    <!-- Admin Transactions Tab -->
+                    <div v-show="activeAdminTab === 'transactions'">
+                        <div class="p-6 border-b">
+                            <h2 class="text-xl font-bold text-gray-900">All Transactions</h2>
+                            <p class="text-gray-600 mt-1">View all user transactions</p>
                         </div>
-                        <div v-else-if="allTransactions.length === 0" class="text-center text-gray-500 py-8">
-                            <p>No transactions found</p>
+                        <div class="p-6">
+                            <div v-if="loading" class="text-center text-gray-500 py-8">
+                                <p>Loading transactions...</p>
+                            </div>
+                            <div v-else-if="allTransactions.length === 0" class="text-center text-gray-500 py-8">
+                                <p>No transactions found</p>
+                            </div>
+                            <div v-else class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-gray-200">
+                                            <th class="text-left py-3 px-4 font-semibold text-gray-900">User</th>
+                                            <th class="text-left py-3 px-4 font-semibold text-gray-900">Product</th>
+                                            <th class="text-left py-3 px-4 font-semibold text-gray-900">Amount</th>
+                                            <th class="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
+                                            <th class="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="transaction in allTransactions" :key="transaction.id" class="border-b border-gray-100">
+                                            <td class="py-3 px-4">{{ transaction.user_id }}</td>
+                                            <td class="py-3 px-4">{{ transaction.product_name }}</td>
+                                            <td class="py-3 px-4">${{ (transaction.amount / 100).toFixed(2) }}</td>
+                                            <td class="py-3 px-4">
+                                                <span :class="getStatusClass(transaction.status)" class="px-2 py-1 rounded-full text-xs font-medium">
+                                                    {{ transaction.status }}
+                                                </span>
+                                            </td>
+                                            <td class="py-3 px-4">{{ formatDate(transaction.created_at) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div v-else class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="border-b border-gray-200">
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">User</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Product</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Amount</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
-                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="transaction in allTransactions" :key="transaction.id" class="border-b border-gray-100">
-                                        <td class="py-3 px-4">{{ transaction.user_id }}</td>
-                                        <td class="py-3 px-4">{{ transaction.product_name }}</td>
-                                        <td class="py-3 px-4">${{ (transaction.amount / 100).toFixed(2) }}</td>
-                                        <td class="py-3 px-4">
-                                            <span :class="getStatusClass(transaction.status)" class="px-2 py-1 rounded-full text-xs font-medium">
-                                                {{ transaction.status }}
-                                            </span>
-                                        </td>
-                                        <td class="py-3 px-4">{{ formatDate(transaction.created_at) }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    </div>
+
+                    <!-- Admin Audits Tab -->
+                    <div v-show="activeAdminTab === 'audits'">
+                        <div class="p-6 border-b flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-900">Audit Events</h2>
+                                <p class="text-gray-600 mt-1">Most recent first</p>
+                            </div>
+                            <div class="space-x-2">
+                                <button @click="loadAuditEvents()" class="px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <div v-if="loadingAudits" class="text-center text-gray-500 py-8">
+                                <p>Loading audit events...</p>
+                            </div>
+                            <div v-else-if="auditEvents.length === 0" class="text-center text-gray-500 py-8">
+                                <p>No audit events found</p>
+                            </div>
+                            <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <!-- Table -->
+                                <div class="lg:col-span-2 overflow-x-auto">
+                                    <table class="w-full">
+                                        <thead>
+                                            <tr class="border-b border-gray-200">
+                                                <th class="text-left py-3 px-4 font-semibold text-gray-900">Time</th>
+                                                <th class="text-left py-3 px-4 font-semibold text-gray-900">Subsystem</th>
+                                                <th class="text-left py-3 px-4 font-semibold text-gray-900">Event</th>
+                                                <th class="text-left py-3 px-4 font-semibold text-gray-900">User</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="event in auditEvents" :key="event.id" 
+                                                @click="selectAuditEvent(event)"
+                                                class="border-b border-gray-100 hover:bg-blue-50 cursor-pointer">
+                                                <td class="py-3 px-4 whitespace-nowrap">{{ formatDate(event.timestamp) }}</td>
+                                                <td class="py-3 px-4">{{ event.subsystem }}</td>
+                                                <td class="py-3 px-4">{{ event.event_type }}</td>
+                                                <td class="py-3 px-4">{{ event.user_id || '-' }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Details Panel -->
+                                <div class="lg:col-span-1">
+                                    <div v-if="selectedAuditEvent" class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h3 class="text-lg font-semibold text-gray-900">Event Details</h3>
+                                            <button @click="selectedAuditEvent = null" class="text-gray-500 hover:text-gray-700">Clear</button>
+                                        </div>
+                                        <div class="text-sm text-gray-700 space-y-2">
+                                            <div><span class="font-medium text-gray-900">ID:</span> {{ selectedAuditEvent.id }}</div>
+                                            <div><span class="font-medium text-gray-900">Timestamp:</span> {{ formatDate(selectedAuditEvent.timestamp) }}</div>
+                                            <div><span class="font-medium text-gray-900">Subsystem:</span> {{ selectedAuditEvent.subsystem }}</div>
+                                            <div><span class="font-medium text-gray-900">Event Type:</span> {{ selectedAuditEvent.event_type }}</div>
+                                            <div><span class="font-medium text-gray-900">User:</span> {{ selectedAuditEvent.user_id || '-' }}</div>
+                                            <div v-if="selectedAuditEvent.information"><span class="font-medium text-gray-900">Info:</span> {{ selectedAuditEvent.information }}</div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <div class="font-medium text-gray-900 mb-1">Payload</div>
+                                            <pre class="text-xs bg-white border border-gray-200 rounded p-3 overflow-auto max-h-80 whitespace-pre-wrap">{{ formatJSON(selectedAuditEvent.payload) }}</pre>
+                                        </div>
+                                    </div>
+                                    <div v-else class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500">
+                                        Select an event to see details
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -214,7 +302,12 @@
                 allTransactions: [],
                 loading: false,
                 successMessage: '',
-                errorMessage: ''
+                errorMessage: '',
+                // Admin audits state
+                activeAdminTab: 'transactions',
+                auditEvents: [],
+                loadingAudits: false,
+                selectedAuditEvent: null
             },
             methods: {
                 selectUser(user) {
@@ -224,7 +317,9 @@
                     // Load data for the selected user
                     this.loadProducts();
                     if (user.role === 'admin') {
+                        this.activeAdminTab = 'transactions';
                         this.loadAllTransactions();
+                        this.loadAuditEvents();
                     } else {
                         this.loadUserTransactions(user.id);
                     }
@@ -326,6 +421,36 @@
                     }
                     this.loading = false;
                 },
+                async loadAuditEvents() {
+                    this.loadingAudits = true;
+                    try {
+                        const response = await fetch('/api/audit-events?limit=100');
+                        if (response.ok) {
+                            const data = await response.json();
+                            // Events are already ordered DESC by backend
+                            this.auditEvents = data.events || [];
+                        } else {
+                            this.auditEvents = [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to load audit events:', error);
+                        this.auditEvents = [];
+                    }
+                    this.loadingAudits = false;
+                },
+                selectAuditEvent(event) {
+                    this.selectedAuditEvent = event;
+                },
+                formatJSON(value) {
+                    if (!value) return '(no payload)';
+                    try {
+                        const obj = JSON.parse(value);
+                        return JSON.stringify(obj, null, 2);
+                    } catch (e) {
+                        // Not valid JSON; return as-is
+                        return String(value);
+                    }
+                },
                 getStatusClass(status) {
                     switch (status) {
                         case 'completed': return 'bg-green-100 text-green-800';
@@ -377,7 +502,9 @@
                         this.currentUser = JSON.parse(storedUser);
                         // Load user-specific data
                         if (this.currentUser.role === 'admin') {
+                            this.activeAdminTab = 'transactions';
                             this.loadAllTransactions();
+                            this.loadAuditEvents();
                         } else {
                             this.loadUserTransactions(this.currentUser.id);
                         }

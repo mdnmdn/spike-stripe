@@ -14,7 +14,7 @@ This is a minimal Go HTTP API skeleton designed for spiking Stripe payment integ
     - `handlers.go` - HTTP endpoint implementations
 - **Business logic**: `internal/payments/` - Payment service abstraction
     - `service.go` - Mock payment service that mimics Stripe operations
-- **Frontend**: `cmd/server/frontend/` - Static HTML assets embedded into binary
+- **Frontend**: `cmd/server/frontend/` - Static HTML assets embedded into binary (includes admin Transactions and new Audits tabs)
 - **API specification**: `openapi.yaml` - OpenAPI 3.0 spec defining the REST endpoints
 - **Database**: `internal/db/` helpers; SQLc generated code goes here. Migrations in `db/migrations`, queries in `db/queries`. Migration runner at `cmd/migrate/`. Uses SQLite locally and Turso when `TURSO_DATABASE_URL` is set.
 
@@ -88,3 +88,7 @@ Available variables:
 - `GET /app` - Serves embedded frontend assets
 
 The application serves both API endpoints and a basic frontend from the same server.
+
+## Directives
+
+- at the end of each spike modification, update the _docs/implementations.md with all the up to date informations

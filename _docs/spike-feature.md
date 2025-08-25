@@ -6,7 +6,9 @@
 - selecting a simple user will show a page with two tabs:
   - buy with a list of 4 products (page product)
   - list of transactions of current user (user transactions)
-- selecting an admin user will show a page with a list of transactions of all users (admin transactions)
+- selecting an admin user will show a page with tabs:
+  - list of transactions of all users (admin transactions)
+  - audits tab to explore audit events ordered from most recent; selecting a row shows a side panel with details and formatted JSON payload
 
 ### Page product
 - list of products (LumaWeave Reactive Threads, Atmospheric Coffee Pods, EchoSprout Memory Plants, PocketForge Nano printer) that could be bought with an invented price
@@ -170,3 +172,4 @@ const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
 - Configure success/cancel URLs to redirect back to application
 - Handle webhook events to update transaction status in database
 - Store Stripe session ID and payment intent ID for reference 
+
