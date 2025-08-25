@@ -77,6 +77,7 @@ Available variables:
 - `STRIPE_WEBHOOK_SECRET` - Webhook endpoint secret (optional for mock)
 - `PORT` - Override server port (default: 8060)
 - `APP_ADDR` - Override server address (default: :8060)
+- `RUN_MIGRATION` - When truthy (true, 1, yes), run DB migrations automatically on startup
 
 ## API Endpoints
 

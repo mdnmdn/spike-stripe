@@ -11,20 +11,21 @@ import (
 )
 
 const createTransaction = `-- name: CreateTransaction :exec
-INSERT INTO transactions (id, user_id, product_id, product_name, amount, stripe_session_id, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO transactions (id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTransactionParams struct {
-	ID              string         `json:"id"`
-	UserID          string         `json:"user_id"`
-	ProductID       string         `json:"product_id"`
-	ProductName     string         `json:"product_name"`
-	Amount          int64          `json:"amount"`
-	StripeSessionID sql.NullString `json:"stripe_session_id"`
-	Status          string         `json:"status"`
-	CreatedAt       string         `json:"created_at"`
-	UpdatedAt       string         `json:"updated_at"`
+	ID                    string         `json:"id"`
+	UserID                string         `json:"user_id"`
+	ProductID             string         `json:"product_id"`
+	ProductName           string         `json:"product_name"`
+	Amount                int64          `json:"amount"`
+	StripeSessionID       sql.NullString `json:"stripe_session_id"`
+	StripePaymentIntentID sql.NullString `json:"stripe_payment_intent_id"`
+	Status                string         `json:"status"`
+	CreatedAt             string         `json:"created_at"`
+	UpdatedAt             string         `json:"updated_at"`
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) error {
@@ -35,6 +36,7 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 		arg.ProductName,
 		arg.Amount,
 		arg.StripeSessionID,
+		arg.StripePaymentIntentID,
 		arg.Status,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -184,6 +186,23 @@ func (q *Queries) ListTransactionsByUserID(ctx context.Context, arg ListTransact
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateTransactionByPaymentIntentID = `-- name: UpdateTransactionByPaymentIntentID :exec
+UPDATE transactions 
+SET status = ?, updated_at = ?
+WHERE stripe_payment_intent_id = ?
+`
+
+type UpdateTransactionByPaymentIntentIDParams struct {
+	Status                string         `json:"status"`
+	UpdatedAt             string         `json:"updated_at"`
+	StripePaymentIntentID sql.NullString `json:"stripe_payment_intent_id"`
+}
+
+func (q *Queries) UpdateTransactionByPaymentIntentID(ctx context.Context, arg UpdateTransactionByPaymentIntentIDParams) error {
+	_, err := q.exec(ctx, q.updateTransactionByPaymentIntentIDStmt, updateTransactionByPaymentIntentID, arg.Status, arg.UpdatedAt, arg.StripePaymentIntentID)
+	return err
 }
 
 const updateTransactionStatus = `-- name: UpdateTransactionStatus :exec

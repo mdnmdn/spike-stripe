@@ -4,8 +4,10 @@ INSERT INTO audit_events (
     event_type,
     user_id,
     information,
-    payload
-) VALUES (?, ?, ?, ?, ?);
+    payload,
+    ref_id,
+    ref_id2
+) VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetAuditEventsBySubsystem :many
 SELECT * FROM audit_events
@@ -39,5 +41,17 @@ LIMIT ? OFFSET ?;
 -- name: GetAuditEventsBySubsystemAndType :many
 SELECT * FROM audit_events
 WHERE subsystem = ? AND event_type = ?
+ORDER BY timestamp DESC
+LIMIT ? OFFSET ?;
+
+-- name: GetAuditEventsByRefID :many
+SELECT * FROM audit_events
+WHERE ref_id = ?
+ORDER BY timestamp DESC
+LIMIT ? OFFSET ?;
+
+-- name: GetAuditEventsByRefID2 :many
+SELECT * FROM audit_events
+WHERE ref_id2 = ?
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?;

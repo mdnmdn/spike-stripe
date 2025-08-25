@@ -27,6 +27,8 @@ type Event struct {
 	UserID      *string
 	Information string
 	Payload     interface{}
+	RefID       *string // Primary reference ID (e.g., payment_intent_id)
+	RefID2      *string // Secondary reference ID (e.g., session_id)
 }
 
 // Log records an audit event
@@ -46,12 +48,24 @@ func (s *Service) Log(ctx context.Context, event Event) error {
 		userID = sql.NullString{String: *event.UserID, Valid: true}
 	}
 
+	var refID sql.NullString
+	if event.RefID != nil {
+		refID = sql.NullString{String: *event.RefID, Valid: true}
+	}
+
+	var refID2 sql.NullString
+	if event.RefID2 != nil {
+		refID2 = sql.NullString{String: *event.RefID2, Valid: true}
+	}
+
 	return s.queries.CreateAuditEvent(ctx, db.CreateAuditEventParams{
 		Subsystem:   event.Subsystem,
 		EventType:   event.EventType,
 		UserID:      userID,
 		Information: sql.NullString{String: event.Information, Valid: event.Information != ""},
 		Payload:     payloadJSON,
+		RefID:       refID,
+		RefId2:      refID2,
 	})
 }
 
@@ -66,6 +80,19 @@ func (s *Service) LogStripe(ctx context.Context, eventType, information string, 
 	})
 }
 
+// LogStripeWithRefs logs a Stripe-related event with reference IDs
+func (s *Service) LogStripeWithRefs(ctx context.Context, eventType, information string, userID *string, payload interface{}, refID, refID2 *string) error {
+	return s.Log(ctx, Event{
+		Subsystem:   "stripe",
+		EventType:   eventType,
+		UserID:      userID,
+		Information: information,
+		Payload:     payload,
+		RefID:       refID,
+		RefID2:      refID2,
+	})
+}
+
 // LogPayment logs a payment-related event
 func (s *Service) LogPayment(ctx context.Context, eventType, information string, userID *string, payload interface{}) error {
 	return s.Log(ctx, Event{
@@ -74,6 +101,19 @@ func (s *Service) LogPayment(ctx context.Context, eventType, information string,
 		UserID:      userID,
 		Information: information,
 		Payload:     payload,
+	})
+}
+
+// LogPaymentWithRefs logs a payment-related event with reference IDs
+func (s *Service) LogPaymentWithRefs(ctx context.Context, eventType, information string, userID *string, payload interface{}, refID, refID2 *string) error {
+	return s.Log(ctx, Event{
+		Subsystem:   "payment",
+		EventType:   eventType,
+		UserID:      userID,
+		Information: information,
+		Payload:     payload,
+		RefID:       refID,
+		RefID2:      refID2,
 	})
 }
 

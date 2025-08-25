@@ -1,32 +1,41 @@
-# Stage 1: Build the Go application
-FROM golang:1.22-alpine AS builder
+# Simple multi-stage Dockerfile for a Go web app
+# Build stage
+FROM golang:1.22-alpine AS build
+WORKDIR /src
 
-# Set the working directory inside the container
-WORKDIR /app
-
-# Copy go.mod and go.sum to download dependencies first
+# Cache dependencies first
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the rest of the source code
+# Copy the rest of the source
 COPY . .
 
-# Build the application
+# Build a static binary
 ENV CGO_ENABLED=0
-RUN go build -o /stripe-go-spike cmd/server/main.go
+RUN go build -o /out/stripe-go-spike ./cmd/server
 
-# Stage 2: Create the final image
+# Runtime stage
 FROM alpine:3.19
 
-# Copy the built binary from the builder stage
-COPY --from=builder /stripe-go-spike /stripe-go-spike
+# Create non-root user and prepare app directory (writable for DB _data)
+RUN addgroup -S appgroup \
+  && adduser -S appuser -G appgroup \
+  && mkdir -p /app/_data \
+  && chown -R appuser:appgroup /app
 
-# Create a non-root user to run the application
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
+WORKDIR /app
 
-# Expose the port the app runs on
+# Copy binary
+COPY --from=build /out/stripe-go-spike ./stripe-go-spike
+
+# Environment
+ENV RUN_MIGRATION=true
+
+# Expose HTTP port
 EXPOSE 8060
 
-# Set the command to run the application
-CMD ["/stripe-go-spike"]
+# Run as non-root
+USER appuser
+
+# Start the server
+CMD ["./stripe-go-spike"]

@@ -15,6 +15,8 @@ type Querier interface {
 	DeleteCacheKey(ctx context.Context, key string) error
 	GetAllAuditEvents(ctx context.Context, arg GetAllAuditEventsParams) ([]AuditEvent, error)
 	GetAuditEventsByEventType(ctx context.Context, arg GetAuditEventsByEventTypeParams) ([]AuditEvent, error)
+	GetAuditEventsByRefID(ctx context.Context, arg GetAuditEventsByRefIDParams) ([]AuditEvent, error)
+	GetAuditEventsByRefID2(ctx context.Context, arg GetAuditEventsByRefID2Params) ([]AuditEvent, error)
 	GetAuditEventsBySubsystem(ctx context.Context, arg GetAuditEventsBySubsystemParams) ([]AuditEvent, error)
 	GetAuditEventsBySubsystemAndType(ctx context.Context, arg GetAuditEventsBySubsystemAndTypeParams) ([]AuditEvent, error)
 	GetAuditEventsByUser(ctx context.Context, arg GetAuditEventsByUserParams) ([]AuditEvent, error)
@@ -26,6 +28,7 @@ type Querier interface {
 	ListCache(ctx context.Context) ([]Cache, error)
 	ListTransactionsByUserID(ctx context.Context, arg ListTransactionsByUserIDParams) ([]Transaction, error)
 	SetCacheValue(ctx context.Context, arg SetCacheValueParams) error
+	UpdateTransactionByPaymentIntentID(ctx context.Context, arg UpdateTransactionByPaymentIntentIDParams) error
 	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) error
 	UpdateTransactionWithStripeData(ctx context.Context, arg UpdateTransactionWithStripeDataParams) error
 }

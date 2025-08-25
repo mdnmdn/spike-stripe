@@ -39,6 +39,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getAuditEventsByEventTypeStmt, err = db.PrepareContext(ctx, getAuditEventsByEventType); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAuditEventsByEventType: %w", err)
 	}
+	if q.getAuditEventsByRefIDStmt, err = db.PrepareContext(ctx, getAuditEventsByRefID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAuditEventsByRefID: %w", err)
+	}
+	if q.getAuditEventsByRefID2Stmt, err = db.PrepareContext(ctx, getAuditEventsByRefID2); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAuditEventsByRefID2: %w", err)
+	}
 	if q.getAuditEventsBySubsystemStmt, err = db.PrepareContext(ctx, getAuditEventsBySubsystem); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAuditEventsBySubsystem: %w", err)
 	}
@@ -71,6 +77,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.setCacheValueStmt, err = db.PrepareContext(ctx, setCacheValue); err != nil {
 		return nil, fmt.Errorf("error preparing query SetCacheValue: %w", err)
+	}
+	if q.updateTransactionByPaymentIntentIDStmt, err = db.PrepareContext(ctx, updateTransactionByPaymentIntentID); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateTransactionByPaymentIntentID: %w", err)
 	}
 	if q.updateTransactionStatusStmt, err = db.PrepareContext(ctx, updateTransactionStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateTransactionStatus: %w", err)
@@ -106,6 +115,16 @@ func (q *Queries) Close() error {
 	if q.getAuditEventsByEventTypeStmt != nil {
 		if cerr := q.getAuditEventsByEventTypeStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getAuditEventsByEventTypeStmt: %w", cerr)
+		}
+	}
+	if q.getAuditEventsByRefIDStmt != nil {
+		if cerr := q.getAuditEventsByRefIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAuditEventsByRefIDStmt: %w", cerr)
+		}
+	}
+	if q.getAuditEventsByRefID2Stmt != nil {
+		if cerr := q.getAuditEventsByRefID2Stmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAuditEventsByRefID2Stmt: %w", cerr)
 		}
 	}
 	if q.getAuditEventsBySubsystemStmt != nil {
@@ -163,6 +182,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing setCacheValueStmt: %w", cerr)
 		}
 	}
+	if q.updateTransactionByPaymentIntentIDStmt != nil {
+		if cerr := q.updateTransactionByPaymentIntentIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateTransactionByPaymentIntentIDStmt: %w", cerr)
+		}
+	}
 	if q.updateTransactionStatusStmt != nil {
 		if cerr := q.updateTransactionStatusStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateTransactionStatusStmt: %w", cerr)
@@ -210,49 +234,55 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                   DBTX
-	tx                                   *sql.Tx
-	createAuditEventStmt                 *sql.Stmt
-	createTransactionStmt                *sql.Stmt
-	deleteCacheKeyStmt                   *sql.Stmt
-	getAllAuditEventsStmt                *sql.Stmt
-	getAuditEventsByEventTypeStmt        *sql.Stmt
-	getAuditEventsBySubsystemStmt        *sql.Stmt
-	getAuditEventsBySubsystemAndTypeStmt *sql.Stmt
-	getAuditEventsByUserStmt             *sql.Stmt
-	getAuditEventsInDateRangeStmt        *sql.Stmt
-	getCacheValueStmt                    *sql.Stmt
-	getTransactionStmt                   *sql.Stmt
-	getTransactionByStripeSessionIDStmt  *sql.Stmt
-	listAllTransactionsStmt              *sql.Stmt
-	listCacheStmt                        *sql.Stmt
-	listTransactionsByUserIDStmt         *sql.Stmt
-	setCacheValueStmt                    *sql.Stmt
-	updateTransactionStatusStmt          *sql.Stmt
-	updateTransactionWithStripeDataStmt  *sql.Stmt
+	db                                     DBTX
+	tx                                     *sql.Tx
+	createAuditEventStmt                   *sql.Stmt
+	createTransactionStmt                  *sql.Stmt
+	deleteCacheKeyStmt                     *sql.Stmt
+	getAllAuditEventsStmt                  *sql.Stmt
+	getAuditEventsByEventTypeStmt          *sql.Stmt
+	getAuditEventsByRefIDStmt              *sql.Stmt
+	getAuditEventsByRefID2Stmt             *sql.Stmt
+	getAuditEventsBySubsystemStmt          *sql.Stmt
+	getAuditEventsBySubsystemAndTypeStmt   *sql.Stmt
+	getAuditEventsByUserStmt               *sql.Stmt
+	getAuditEventsInDateRangeStmt          *sql.Stmt
+	getCacheValueStmt                      *sql.Stmt
+	getTransactionStmt                     *sql.Stmt
+	getTransactionByStripeSessionIDStmt    *sql.Stmt
+	listAllTransactionsStmt                *sql.Stmt
+	listCacheStmt                          *sql.Stmt
+	listTransactionsByUserIDStmt           *sql.Stmt
+	setCacheValueStmt                      *sql.Stmt
+	updateTransactionByPaymentIntentIDStmt *sql.Stmt
+	updateTransactionStatusStmt            *sql.Stmt
+	updateTransactionWithStripeDataStmt    *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                   tx,
-		tx:                                   tx,
-		createAuditEventStmt:                 q.createAuditEventStmt,
-		createTransactionStmt:                q.createTransactionStmt,
-		deleteCacheKeyStmt:                   q.deleteCacheKeyStmt,
-		getAllAuditEventsStmt:                q.getAllAuditEventsStmt,
-		getAuditEventsByEventTypeStmt:        q.getAuditEventsByEventTypeStmt,
-		getAuditEventsBySubsystemStmt:        q.getAuditEventsBySubsystemStmt,
-		getAuditEventsBySubsystemAndTypeStmt: q.getAuditEventsBySubsystemAndTypeStmt,
-		getAuditEventsByUserStmt:             q.getAuditEventsByUserStmt,
-		getAuditEventsInDateRangeStmt:        q.getAuditEventsInDateRangeStmt,
-		getCacheValueStmt:                    q.getCacheValueStmt,
-		getTransactionStmt:                   q.getTransactionStmt,
-		getTransactionByStripeSessionIDStmt:  q.getTransactionByStripeSessionIDStmt,
-		listAllTransactionsStmt:              q.listAllTransactionsStmt,
-		listCacheStmt:                        q.listCacheStmt,
-		listTransactionsByUserIDStmt:         q.listTransactionsByUserIDStmt,
-		setCacheValueStmt:                    q.setCacheValueStmt,
-		updateTransactionStatusStmt:          q.updateTransactionStatusStmt,
-		updateTransactionWithStripeDataStmt:  q.updateTransactionWithStripeDataStmt,
+		db:                                     tx,
+		tx:                                     tx,
+		createAuditEventStmt:                   q.createAuditEventStmt,
+		createTransactionStmt:                  q.createTransactionStmt,
+		deleteCacheKeyStmt:                     q.deleteCacheKeyStmt,
+		getAllAuditEventsStmt:                  q.getAllAuditEventsStmt,
+		getAuditEventsByEventTypeStmt:          q.getAuditEventsByEventTypeStmt,
+		getAuditEventsByRefIDStmt:              q.getAuditEventsByRefIDStmt,
+		getAuditEventsByRefID2Stmt:             q.getAuditEventsByRefID2Stmt,
+		getAuditEventsBySubsystemStmt:          q.getAuditEventsBySubsystemStmt,
+		getAuditEventsBySubsystemAndTypeStmt:   q.getAuditEventsBySubsystemAndTypeStmt,
+		getAuditEventsByUserStmt:               q.getAuditEventsByUserStmt,
+		getAuditEventsInDateRangeStmt:          q.getAuditEventsInDateRangeStmt,
+		getCacheValueStmt:                      q.getCacheValueStmt,
+		getTransactionStmt:                     q.getTransactionStmt,
+		getTransactionByStripeSessionIDStmt:    q.getTransactionByStripeSessionIDStmt,
+		listAllTransactionsStmt:                q.listAllTransactionsStmt,
+		listCacheStmt:                          q.listCacheStmt,
+		listTransactionsByUserIDStmt:           q.listTransactionsByUserIDStmt,
+		setCacheValueStmt:                      q.setCacheValueStmt,
+		updateTransactionByPaymentIntentIDStmt: q.updateTransactionByPaymentIntentIDStmt,
+		updateTransactionStatusStmt:            q.updateTransactionStatusStmt,
+		updateTransactionWithStripeDataStmt:    q.updateTransactionWithStripeDataStmt,
 	}
 }

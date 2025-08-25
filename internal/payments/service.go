@@ -40,9 +40,10 @@ type CheckoutSessionParams struct {
 
 // CheckoutSession represents a simplified session response.
 type CheckoutSession struct {
-	ID        string    `json:"id"`
-	URL       string    `json:"url"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID              string    `json:"id"`
+	URL             string    `json:"url"`
+	PaymentIntentID string    `json:"payment_intent_id,omitempty"`
+	CreatedAt       time.Time `json:"createdAt"`
 }
 
 // CreateCheckoutSession creates a Stripe checkout session or returns a mock if no API key is set.
@@ -53,10 +54,12 @@ func (s *Service) CreateCheckoutSession(p CheckoutSessionParams) (*CheckoutSessi
 
 	// If no Stripe secret key is configured, return mock response
 	if s.cfg.SecretKey == "" {
+		mockID := uuid.New().String()
 		return &CheckoutSession{
-			ID:        "sess_mock_" + uuid.New().String(),
-			URL:       fmt.Sprintf("https://checkout.stripe.com/pay/sess_mock_%s", uuid.New().String()),
-			CreatedAt: time.Now(),
+			ID:              "sess_mock_" + mockID,
+			URL:             fmt.Sprintf("https://checkout.stripe.com/pay/sess_mock_%s", mockID),
+			PaymentIntentID: "pi_mock_" + mockID,
+			CreatedAt:       time.Now(),
 		}, nil
 	}
 
@@ -98,29 +101,39 @@ func (s *Service) CreateCheckoutSession(p CheckoutSessionParams) (*CheckoutSessi
 		return nil, fmt.Errorf("failed to create Stripe session: %w", err)
 	}
 
-	return &CheckoutSession{
+	checkoutSession := &CheckoutSession{
 		ID:        sess.ID,
 		URL:       sess.URL,
 		CreatedAt: time.Unix(sess.Created, 0),
-	}, nil
+	}
+
+	// Extract payment intent ID if available
+	if sess.PaymentIntent != nil {
+		checkoutSession.PaymentIntentID = sess.PaymentIntent.ID
+	}
+
+	return checkoutSession, nil
 }
 
 // WebhookEvent represents a Stripe webhook event
 type WebhookEvent struct {
-	Type      string                 `json:"type"`
-	Data      map[string]interface{} `json:"data"`
-	SessionID string                 `json:"session_id,omitempty"`
-	Status    string                 `json:"status,omitempty"`
+	Type            string                 `json:"type"`
+	Data            map[string]interface{} `json:"data"`
+	SessionID       string                 `json:"session_id,omitempty"`
+	PaymentIntentID string                 `json:"payment_intent_id,omitempty"`
+	Status          string                 `json:"status,omitempty"`
 }
 
 // ProcessWebhook processes a Stripe webhook event
 func (s *Service) ProcessWebhook(payload []byte, signature string) (*WebhookEvent, error) {
 	// If no webhook secret is configured, return mock event
 	if s.cfg.WebhookSecret == "" {
+		mockID := uuid.New().String()
 		return &WebhookEvent{
-			Type:   "checkout.session.completed",
-			Data:   make(map[string]interface{}),
-			Status: "completed",
+			Type:            "checkout.session.completed",
+			Data:            make(map[string]interface{}),
+			PaymentIntentID: "pi_mock_" + mockID,
+			Status:          "completed",
 		}, nil
 	}
 
@@ -144,14 +157,28 @@ func (s *Service) ProcessWebhook(payload []byte, signature string) (*WebhookEven
 			webhookEvent.SessionID = sessionData
 			webhookEvent.Status = "completed"
 		}
+		// Extract payment intent ID from session
+		if paymentIntentData, ok := event.Data.Object["payment_intent"].(string); ok {
+			webhookEvent.PaymentIntentID = paymentIntentData
+		}
 	case "payment_intent.succeeded":
 		webhookEvent.Status = "completed"
+		if paymentIntentData, ok := event.Data.Object["id"].(string); ok {
+			webhookEvent.PaymentIntentID = paymentIntentData
+		}
 	case "payment_intent.payment_failed":
 		webhookEvent.Status = "failed"
+		if paymentIntentData, ok := event.Data.Object["id"].(string); ok {
+			webhookEvent.PaymentIntentID = paymentIntentData
+		}
 	case "checkout.session.expired":
 		if sessionData, ok := event.Data.Object["id"].(string); ok {
 			webhookEvent.SessionID = sessionData
 			webhookEvent.Status = "cancelled"
+		}
+		// Extract payment intent ID from session
+		if paymentIntentData, ok := event.Data.Object["payment_intent"].(string); ok {
+			webhookEvent.PaymentIntentID = paymentIntentData
 		}
 	}
 

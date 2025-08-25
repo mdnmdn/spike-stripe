@@ -16,8 +16,10 @@ INSERT INTO audit_events (
     event_type,
     user_id,
     information,
-    payload
-) VALUES (?, ?, ?, ?, ?)
+    payload,
+    ref_id,
+    ref_id2
+) VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAuditEventParams struct {
@@ -26,6 +28,8 @@ type CreateAuditEventParams struct {
 	UserID      sql.NullString `json:"user_id"`
 	Information sql.NullString `json:"information"`
 	Payload     sql.NullString `json:"payload"`
+	RefID       sql.NullString `json:"ref_id"`
+	RefId2      sql.NullString `json:"ref_id2"`
 }
 
 func (q *Queries) CreateAuditEvent(ctx context.Context, arg CreateAuditEventParams) error {
@@ -35,12 +39,14 @@ func (q *Queries) CreateAuditEvent(ctx context.Context, arg CreateAuditEventPara
 		arg.UserID,
 		arg.Information,
 		arg.Payload,
+		arg.RefID,
+		arg.RefId2,
 	)
 	return err
 }
 
 const getAllAuditEvents = `-- name: GetAllAuditEvents :many
-SELECT id, timestamp, subsystem, event_type, user_id, information, payload FROM audit_events
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?
 `
@@ -67,6 +73,8 @@ func (q *Queries) GetAllAuditEvents(ctx context.Context, arg GetAllAuditEventsPa
 			&i.UserID,
 			&i.Information,
 			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
 		); err != nil {
 			return nil, err
 		}
@@ -82,7 +90,7 @@ func (q *Queries) GetAllAuditEvents(ctx context.Context, arg GetAllAuditEventsPa
 }
 
 const getAuditEventsByEventType = `-- name: GetAuditEventsByEventType :many
-SELECT id, timestamp, subsystem, event_type, user_id, information, payload FROM audit_events
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
 WHERE event_type = ?
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?
@@ -111,6 +119,100 @@ func (q *Queries) GetAuditEventsByEventType(ctx context.Context, arg GetAuditEve
 			&i.UserID,
 			&i.Information,
 			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAuditEventsByRefID = `-- name: GetAuditEventsByRefID :many
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
+WHERE ref_id = ?
+ORDER BY timestamp DESC
+LIMIT ? OFFSET ?
+`
+
+type GetAuditEventsByRefIDParams struct {
+	RefID  sql.NullString `json:"ref_id"`
+	Limit  int64          `json:"limit"`
+	Offset int64          `json:"offset"`
+}
+
+func (q *Queries) GetAuditEventsByRefID(ctx context.Context, arg GetAuditEventsByRefIDParams) ([]AuditEvent, error) {
+	rows, err := q.query(ctx, q.getAuditEventsByRefIDStmt, getAuditEventsByRefID, arg.RefID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuditEvent{}
+	for rows.Next() {
+		var i AuditEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Timestamp,
+			&i.Subsystem,
+			&i.EventType,
+			&i.UserID,
+			&i.Information,
+			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAuditEventsByRefID2 = `-- name: GetAuditEventsByRefID2 :many
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
+WHERE ref_id2 = ?
+ORDER BY timestamp DESC
+LIMIT ? OFFSET ?
+`
+
+type GetAuditEventsByRefID2Params struct {
+	RefId2 sql.NullString `json:"ref_id2"`
+	Limit  int64          `json:"limit"`
+	Offset int64          `json:"offset"`
+}
+
+func (q *Queries) GetAuditEventsByRefID2(ctx context.Context, arg GetAuditEventsByRefID2Params) ([]AuditEvent, error) {
+	rows, err := q.query(ctx, q.getAuditEventsByRefID2Stmt, getAuditEventsByRefID2, arg.RefId2, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuditEvent{}
+	for rows.Next() {
+		var i AuditEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Timestamp,
+			&i.Subsystem,
+			&i.EventType,
+			&i.UserID,
+			&i.Information,
+			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
 		); err != nil {
 			return nil, err
 		}
@@ -126,7 +228,7 @@ func (q *Queries) GetAuditEventsByEventType(ctx context.Context, arg GetAuditEve
 }
 
 const getAuditEventsBySubsystem = `-- name: GetAuditEventsBySubsystem :many
-SELECT id, timestamp, subsystem, event_type, user_id, information, payload FROM audit_events
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
 WHERE subsystem = ?
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?
@@ -155,6 +257,8 @@ func (q *Queries) GetAuditEventsBySubsystem(ctx context.Context, arg GetAuditEve
 			&i.UserID,
 			&i.Information,
 			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
 		); err != nil {
 			return nil, err
 		}
@@ -170,7 +274,7 @@ func (q *Queries) GetAuditEventsBySubsystem(ctx context.Context, arg GetAuditEve
 }
 
 const getAuditEventsBySubsystemAndType = `-- name: GetAuditEventsBySubsystemAndType :many
-SELECT id, timestamp, subsystem, event_type, user_id, information, payload FROM audit_events
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
 WHERE subsystem = ? AND event_type = ?
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?
@@ -205,6 +309,8 @@ func (q *Queries) GetAuditEventsBySubsystemAndType(ctx context.Context, arg GetA
 			&i.UserID,
 			&i.Information,
 			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
 		); err != nil {
 			return nil, err
 		}
@@ -220,7 +326,7 @@ func (q *Queries) GetAuditEventsBySubsystemAndType(ctx context.Context, arg GetA
 }
 
 const getAuditEventsByUser = `-- name: GetAuditEventsByUser :many
-SELECT id, timestamp, subsystem, event_type, user_id, information, payload FROM audit_events
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
 WHERE user_id = ?
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?
@@ -249,6 +355,8 @@ func (q *Queries) GetAuditEventsByUser(ctx context.Context, arg GetAuditEventsBy
 			&i.UserID,
 			&i.Information,
 			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
 		); err != nil {
 			return nil, err
 		}
@@ -264,7 +372,7 @@ func (q *Queries) GetAuditEventsByUser(ctx context.Context, arg GetAuditEventsBy
 }
 
 const getAuditEventsInDateRange = `-- name: GetAuditEventsInDateRange :many
-SELECT id, timestamp, subsystem, event_type, user_id, information, payload FROM audit_events
+SELECT id, timestamp, subsystem, event_type, user_id, information, payload, ref_id, ref_id2 FROM audit_events
 WHERE timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC
 LIMIT ? OFFSET ?
@@ -299,6 +407,8 @@ func (q *Queries) GetAuditEventsInDateRange(ctx context.Context, arg GetAuditEve
 			&i.UserID,
 			&i.Information,
 			&i.Payload,
+			&i.RefID,
+			&i.RefId2,
 		); err != nil {
 			return nil, err
 		}

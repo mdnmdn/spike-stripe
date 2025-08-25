@@ -16,6 +16,8 @@ type AuditEvent struct {
 	UserID      sql.NullString `json:"user_id"`
 	Information sql.NullString `json:"information"`
 	Payload     sql.NullString `json:"payload"`
+	RefID       sql.NullString `json:"ref_id"`
+	RefId2      sql.NullString `json:"ref_id2"`
 }
 
 type Cache struct {

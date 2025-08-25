@@ -91,19 +91,6 @@ func (h *Handlers) CreateCheckoutSession(c *gin.Context) {
 	transactionID := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	// Log transaction creation start
-	h.auditService.LogPayment(c.Request.Context(), "transaction.created",
-		"Transaction created for checkout session",
-		&req.UserID,
-		map[string]interface{}{
-			"transaction_id": transactionID,
-			"user_id":        req.UserID,
-			"product_id":     req.ProductID,
-			"product_name":   product.Name,
-			"amount":         product.Price,
-			"currency":       "usd",
-		})
-
 	// Create Stripe checkout session
 	sess, err := h.service.CreateCheckoutSession(payments.CheckoutSessionParams{
 		Amount:        product.Price,
@@ -125,17 +112,45 @@ func (h *Handlers) CreateCheckoutSession(c *gin.Context) {
 		return
 	}
 
+	// Now log transaction creation with the payment intent and session IDs
+	var paymentIntentRef *string
+	if sess.PaymentIntentID != "" {
+		paymentIntentRef = &sess.PaymentIntentID
+	}
+	h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.created",
+		"Transaction created for checkout session",
+		&req.UserID,
+		map[string]interface{}{
+			"transaction_id":    transactionID,
+			"user_id":           req.UserID,
+			"product_id":        req.ProductID,
+			"product_name":      product.Name,
+			"amount":            product.Price,
+			"currency":          "usd",
+			"session_id":        sess.ID,
+			"payment_intent_id": sess.PaymentIntentID,
+		},
+		paymentIntentRef, // payment intent ID as primary reference
+		&sess.ID,         // session ID as secondary reference
+	)
+
 	// Save transaction to database
+	var stripePaymentIntentID sql.NullString
+	if sess.PaymentIntentID != "" {
+		stripePaymentIntentID = sql.NullString{String: sess.PaymentIntentID, Valid: true}
+	}
+
 	err = h.queries.CreateTransaction(c.Request.Context(), db.CreateTransactionParams{
-		ID:              transactionID,
-		UserID:          req.UserID,
-		ProductID:       req.ProductID,
-		ProductName:     product.Name,
-		Amount:          product.Price,
-		StripeSessionID: sql.NullString{String: sess.ID, Valid: true},
-		Status:          "pending",
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                    transactionID,
+		UserID:                req.UserID,
+		ProductID:             req.ProductID,
+		ProductName:           product.Name,
+		Amount:                product.Price,
+		StripeSessionID:       sql.NullString{String: sess.ID, Valid: true},
+		StripePaymentIntentID: stripePaymentIntentID,
+		Status:                "pending",
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create transaction"})
@@ -304,7 +319,7 @@ func (h *Handlers) Webhook(c *gin.Context) {
 	// Get the Stripe signature header
 	signature := c.GetHeader("Stripe-Signature")
 
-	// Log webhook received
+	// Log webhook received (no reference IDs available yet)
 	h.auditService.LogStripe(c.Request.Context(), "webhook.received",
 		"Stripe webhook event received",
 		nil,
@@ -318,7 +333,7 @@ func (h *Handlers) Webhook(c *gin.Context) {
 	// Process the webhook event
 	event, err := h.service.ProcessWebhook(body, signature)
 	if err != nil {
-		// Log webhook processing failure
+		// Log webhook processing failure (no reference IDs available)
 		h.auditService.LogStripe(c.Request.Context(), "webhook.processing_failed",
 			"Failed to process webhook event",
 			nil,
@@ -330,74 +345,165 @@ func (h *Handlers) Webhook(c *gin.Context) {
 		return
 	}
 
-	// Log successful webhook processing
-	h.auditService.LogStripe(c.Request.Context(), "webhook.processed",
+	// Log successful webhook processing with reference IDs
+	var paymentIntentRef, sessionRef *string
+	if event.PaymentIntentID != "" {
+		paymentIntentRef = &event.PaymentIntentID
+	}
+	if event.SessionID != "" {
+		sessionRef = &event.SessionID
+	}
+	h.auditService.LogStripeWithRefs(c.Request.Context(), "webhook.processed",
 		"Stripe webhook event processed successfully",
 		nil,
 		map[string]interface{}{
-			"event_type": event.Type,
-			"session_id": event.SessionID,
-			"status":     event.Status,
-		})
+			"event_type":        event.Type,
+			"session_id":        event.SessionID,
+			"payment_intent_id": event.PaymentIntentID,
+			"status":            event.Status,
+		},
+		paymentIntentRef, // payment intent ID as primary reference
+		sessionRef,       // session ID as secondary reference
+	)
 
 	// Handle different event types
 	switch event.Type {
 	case "checkout.session.completed":
 		if event.SessionID != "" {
-			// Log session completion
-			h.auditService.LogStripe(c.Request.Context(), "checkout_session.completed",
+			// Log session completion with reference IDs
+			var paymentIntentRef *string
+			if event.PaymentIntentID != "" {
+				paymentIntentRef = &event.PaymentIntentID
+			}
+			h.auditService.LogStripeWithRefs(c.Request.Context(), "checkout_session.completed",
 				"Checkout session completed",
 				nil,
 				map[string]interface{}{
-					"session_id": event.SessionID,
-				})
+					"session_id":        event.SessionID,
+					"payment_intent_id": event.PaymentIntentID,
+				},
+				paymentIntentRef, // payment intent ID as primary reference
+				&event.SessionID, // session ID as secondary reference
+			)
 
 			// Update transaction status in database
 			now := time.Now().UTC().Format(time.RFC3339)
+			var paymentIntentID sql.NullString
+			if event.PaymentIntentID != "" {
+				paymentIntentID = sql.NullString{String: event.PaymentIntentID, Valid: true}
+			}
+
 			err = h.queries.UpdateTransactionWithStripeData(c.Request.Context(), db.UpdateTransactionWithStripeDataParams{
 				StripeSessionID:       sql.NullString{String: event.SessionID, Valid: true},
-				StripePaymentIntentID: sql.NullString{String: "", Valid: false}, // Will be updated by payment_intent.succeeded
+				StripePaymentIntentID: paymentIntentID,
 				Status:                "completed",
 				UpdatedAt:             now,
 			})
 			if err != nil {
-				// Log database update failure
-				h.auditService.LogPayment(c.Request.Context(), "transaction.update_failed",
+				// Log database update failure with reference IDs
+				var paymentIntentRef *string
+				if event.PaymentIntentID != "" {
+					paymentIntentRef = &event.PaymentIntentID
+				}
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.update_failed",
 					"Failed to update transaction status",
 					nil,
 					map[string]interface{}{
-						"session_id": event.SessionID,
-						"error":      err.Error(),
-					})
+						"session_id":        event.SessionID,
+						"payment_intent_id": event.PaymentIntentID,
+						"error":             err.Error(),
+					},
+					paymentIntentRef, // payment intent ID as primary reference
+					&event.SessionID, // session ID as secondary reference
+				)
 				// Log error but don't fail the webhook
 				// In production, you might want to queue this for retry
 			} else {
-				// Log successful transaction update
-				h.auditService.LogPayment(c.Request.Context(), "transaction.completed",
+				// Log successful transaction update with reference IDs
+				var paymentIntentRef *string
+				if event.PaymentIntentID != "" {
+					paymentIntentRef = &event.PaymentIntentID
+				}
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.completed",
 					"Transaction marked as completed",
 					nil,
 					map[string]interface{}{
-						"session_id": event.SessionID,
-					})
+						"session_id":        event.SessionID,
+						"payment_intent_id": event.PaymentIntentID,
+					},
+					paymentIntentRef, // payment intent ID as primary reference
+					&event.SessionID, // session ID as secondary reference
+				)
 			}
 		}
 
 	case "payment_intent.succeeded":
 		// Payment completed successfully
-		// Additional processing could be done here
+		if event.PaymentIntentID != "" {
+			now := time.Now().UTC().Format(time.RFC3339)
+			err = h.queries.UpdateTransactionByPaymentIntentID(c.Request.Context(), db.UpdateTransactionByPaymentIntentIDParams{
+				StripePaymentIntentID: sql.NullString{String: event.PaymentIntentID, Valid: true},
+				Status:                "completed",
+				UpdatedAt:             now,
+			})
+			if err != nil {
+				// Log database update failure with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.update_failed",
+					"Failed to update transaction status for payment intent",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+						"error":             err.Error(),
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
+			} else {
+				// Log successful transaction update with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.completed",
+					"Transaction marked as completed via payment intent",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
+			}
+		}
 
 	case "payment_intent.payment_failed":
 		// Mark transaction as failed
-		if event.SessionID != "" {
+		if event.PaymentIntentID != "" {
 			now := time.Now().UTC().Format(time.RFC3339)
-			err = h.queries.UpdateTransactionWithStripeData(c.Request.Context(), db.UpdateTransactionWithStripeDataParams{
-				StripeSessionID:       sql.NullString{String: event.SessionID, Valid: true},
-				StripePaymentIntentID: sql.NullString{String: "", Valid: false},
+			err = h.queries.UpdateTransactionByPaymentIntentID(c.Request.Context(), db.UpdateTransactionByPaymentIntentIDParams{
+				StripePaymentIntentID: sql.NullString{String: event.PaymentIntentID, Valid: true},
 				Status:                "failed",
 				UpdatedAt:             now,
 			})
 			if err != nil {
-				// Log error but don't fail the webhook
+				// Log database update failure with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.update_failed",
+					"Failed to update transaction status for failed payment",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+						"error":             err.Error(),
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
+			} else {
+				// Log successful transaction update with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.failed",
+					"Transaction marked as failed via payment intent",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
 			}
 		}
 
@@ -440,12 +546,26 @@ func (h *Handlers) GetAuditEvents(c *gin.Context) {
 	subsystem := c.Query("subsystem")
 	eventType := c.Query("event_type")
 	userID := c.Query("user_id")
+	refID := c.Query("ref_id")
+	refID2 := c.Query("ref_id2")
 
 	var events []db.AuditEvent
 	var err error
 
-	// Query based on filters
-	if subsystem != "" && eventType != "" {
+	// Query based on filters (prioritize reference ID queries)
+	if refID != "" {
+		events, err = h.queries.GetAuditEventsByRefID(c.Request.Context(), db.GetAuditEventsByRefIDParams{
+			RefID:  sql.NullString{String: refID, Valid: true},
+			Limit:  limit,
+			Offset: offset,
+		})
+	} else if refID2 != "" {
+		events, err = h.queries.GetAuditEventsByRefID2(c.Request.Context(), db.GetAuditEventsByRefID2Params{
+			RefId2: sql.NullString{String: refID2, Valid: true},
+			Limit:  limit,
+			Offset: offset,
+		})
+	} else if subsystem != "" && eventType != "" {
 		events, err = h.queries.GetAuditEventsBySubsystemAndType(c.Request.Context(), db.GetAuditEventsBySubsystemAndTypeParams{
 			Subsystem: subsystem,
 			EventType: eventType,
