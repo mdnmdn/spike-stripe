@@ -112,6 +112,7 @@
                                             <th class="text-left py-3 px-4 font-semibold text-gray-900">Amount</th>
                                             <th class="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
                                             <th class="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
+                                            <th class="text-left py-3 px-4 font-semibold text-gray-900">Refund Date</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -125,6 +126,12 @@
                                                 </span>
                                             </td>
                                             <td class="py-3 px-4">{{ formatDate(transaction.created_at) }}</td>
+                                            <td class="py-3 px-4">
+                                                <span v-if="transaction.refund_date" class="text-red-600">
+                                                    {{ formatDate(transaction.refund_date) }}
+                                                </span>
+                                                <span v-else class="text-gray-400">-</span>
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -192,6 +199,10 @@
                                         <div class="mt-4">
                                             <div class="font-medium text-gray-900 mb-1">Payload</div>
                                             <pre class="text-xs bg-white border border-gray-200 rounded p-3 overflow-auto max-h-80 whitespace-pre-wrap">{{ formatJSON(selectedAuditEvent.payload) }}</pre>
+                                        </div>
+                                        <div v-if="selectedAuditEventBody" class="mt-4">
+                                            <div class="font-medium text-gray-900 mb-1">Body</div>
+                                            <pre class="text-xs bg-white border border-gray-200 rounded p-3 overflow-auto max-h-80 whitespace-pre-wrap">{{ JSON.stringify(selectedAuditEventBody, null, 2) }}</pre>
                                         </div>
                                     </div>
                                     <div v-else class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500">
@@ -268,6 +279,7 @@
                                         <th class="text-left py-3 px-4 font-semibold text-gray-900">Amount</th>
                                         <th class="text-left py-3 px-4 font-semibold text-gray-900">Status</th>
                                         <th class="text-left py-3 px-4 font-semibold text-gray-900">Date</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-900">Refund Date</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -280,6 +292,12 @@
                                             </span>
                                         </td>
                                         <td class="py-3 px-4">{{ formatDate(transaction.created_at) }}</td>
+                                        <td class="py-3 px-4">
+                                            <span v-if="transaction.refund_date" class="text-red-600">
+                                                {{ formatDate(transaction.refund_date) }}
+                                            </span>
+                                            <span v-else class="text-gray-400">-</span>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -307,7 +325,8 @@
                 activeAdminTab: 'transactions',
                 auditEvents: [],
                 loadingAudits: false,
-                selectedAuditEvent: null
+                selectedAuditEvent: null,
+                selectedAuditEventBody: null
             },
             methods: {
                 selectUser(user) {
@@ -440,6 +459,23 @@
                 },
                 selectAuditEvent(event) {
                     this.selectedAuditEvent = event;
+                    this.selectedAuditEventBody = null;
+                    // Attempt to parse raw_body from payload
+                    if (event && event.payload) {
+                        try {
+                            const payloadObj = JSON.parse(event.payload);
+                            if (payloadObj && typeof payloadObj === 'object' && payloadObj.raw_body) {
+                                try {
+                                    this.selectedAuditEventBody = JSON.parse(payloadObj.raw_body);
+                                } catch (e) {
+                                    // raw_body isn't valid JSON; leave as null
+                                    this.selectedAuditEventBody = null;
+                                }
+                            }
+                        } catch (e) {
+                            // payload not JSON; ignore
+                        }
+                    }
                 },
                 formatJSON(value) {
                     if (!value) return '(no payload)';
@@ -457,6 +493,7 @@
                         case 'pending': return 'bg-yellow-100 text-yellow-800';
                         case 'failed': return 'bg-red-100 text-red-800';
                         case 'cancelled': return 'bg-gray-100 text-gray-800';
+                        case 'refunded': return 'bg-orange-100 text-orange-800';
                         default: return 'bg-gray-100 text-gray-800';
                     }
                 },

@@ -45,6 +45,10 @@ The Stripe Go Spike is a complete Go HTTP API for prototyping Stripe payment int
 - Native `sessionStorage` for session management
 - Fetch API for backend communication
 
+**Enhanced Transaction Status Display:**
+- Color-coded status indicators for all transaction states
+- Status colors: completed (green), pending (yellow), failed (red), cancelled (gray), **refunded (orange)**
+
 #### 2. Backend API Structure (`internal/api/`)
 
 **Router Configuration (`router.go`):**
@@ -118,7 +122,10 @@ CREATE TABLE transactions (
     - `checkout.session.completed` (with payment intent correlation)
     - `payment_intent.succeeded` (with direct payment intent updates)
     - `payment_intent.payment_failed` (with direct payment intent updates)
-    - `checkout.session.expired`
+    - `checkout.session.expired` (with enhanced audit logging and payment intent correlation)
+    - **`payment_intent.canceled`** (direct payment intent cancellation handling)
+    - **`charge.dispute.created`** (dispute handling marking transactions as refunded)
+    - **`refund.created`** (refund processing with payment intent correlation)
 
 **Dual Mode Operation:**
 - **With Stripe Keys**: Full Stripe integration with real checkout sessions
@@ -169,6 +176,8 @@ CREATE TABLE audit_events (
 - `transaction.created` - Transaction metadata at creation time **+ payment intent/session correlation**
 - `transaction.completed` - Database update success after webhook **+ payment intent/session correlation**
 - `transaction.failed` - Transaction marked as failed **+ payment intent correlation**
+- **`transaction.cancelled`** - Transaction marked as cancelled **+ payment intent/session correlation**
+- **`transaction.refunded`** - Transaction marked as refunded **+ payment intent correlation**
 - `transaction.update_failed` - Database update failures **+ payment intent/session correlation**
 
 **API Query Endpoint:**
@@ -264,7 +273,7 @@ The application supports flexible environment configuration through dotenv files
 - `STRIPE_SECRET_KEY` - Stripe secret API key (optional - uses mock if not set)
 - `STRIPE_PUBLISHABLE_KEY` - Stripe publishable key (optional)
 - `STRIPE_WEBHOOK_SECRET` - Webhook endpoint secret (optional)
-- `DB_PATH` - SQLite database path (optional, defaults to `_data/db-spike-strip.sqlite3`)
+- `DB_PATH` - SQLite database path (optional, defaults to `_data/db-spike-stripe.sqlite3`)
 - `TURSO_DATABASE_URL` - Turso cloud database (optional)
 - `TURSO_AUTH_TOKEN` - Turso authentication token (optional)
 - `BASE_URL` - Base URL for Stripe redirect URLs (optional, defaults to `http://localhost:8060`)

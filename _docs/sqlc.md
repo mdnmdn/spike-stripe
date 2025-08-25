@@ -58,6 +58,14 @@ This creates the generated package under `internal/db`.
   );
   ```
 
+- Migration tracking table is created automatically by the runner:
+  ```sql
+  CREATE TABLE IF NOT EXISTS _migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  ```
+
 - `db/queries/cache.sql`
   ```sql
   -- name: GetCacheValue :one
@@ -84,7 +92,7 @@ Selection logic:
 - Otherwise open a local SQLite database file.
 
 Environment variables:
-- `DB_PATH`: optional path to local SQLite file; default: `_data/db-spike-strip.sqlite3`
+- `DB_PATH`: optional path to local SQLite file; default: `_data/db-spike-stripe.sqlite3`
 - `TURSO_DATABASE_URL`: Turso connection URL (libsql://...)
 - `TURSO_AUTH_TOKEN`: Turso auth token (optional if DB is public)
 
@@ -92,13 +100,13 @@ The SQLite driver used is `modernc.org/sqlite` (driver name `sqlite`), so no CGO
 
 ## Migrations
 
-A tiny migration runner is included at `cmd/migrate`. It applies all `.sql` files in `db/migrations` in lexical order.
+A tiny migration runner is included at `cmd/migrate`. It applies all `.sql` files in `db/migrations` in lexical order and records applied scripts in a `_migrations` table to avoid re-running the same file.
 
-Run locally (SQLite by default at `_data/db-spike-strip.sqlite3`):
+Run locally (SQLite by default at `_data/db-spike-stripe.sqlite3`):
 
 ```bash
 # optional: override local db path
-export DB_PATH=_data/db-spike-strip.sqlite3
+export DB_PATH=_data/db-spike-stripe.sqlite3
 
 # apply migrations
 go run cmd/migrate/main.go

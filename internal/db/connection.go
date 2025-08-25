@@ -12,7 +12,7 @@ import (
 )
 
 // DefaultLocalDBPath is used when no DB_PATH is provided.
-const DefaultLocalDBPath = "_data/db-spike-strip.sqlite3"
+const DefaultLocalDBPath = "_data/db-spike-stripe.sqlite3"
 
 // NewConnection returns a *sql.DB connected either to Turso (when TURSO_DATABASE_URL is set)
 // or to a local SQLite database file. You can override the local path with DB_PATH.

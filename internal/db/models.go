@@ -36,4 +36,5 @@ type Transaction struct {
 	Status                string         `json:"status"`
 	CreatedAt             string         `json:"created_at"`
 	UpdatedAt             string         `json:"updated_at"`
+	RefundDate            sql.NullString `json:"refund_date"`
 }

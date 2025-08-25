@@ -151,6 +151,7 @@ func (h *Handlers) CreateCheckoutSession(c *gin.Context) {
 		Status:                "pending",
 		CreatedAt:             now,
 		UpdatedAt:             now,
+		RefundDate:            sql.NullString{}, // Initially null
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create transaction"})
@@ -238,6 +239,13 @@ func (h *Handlers) GetUserTransactions(c *gin.Context) {
 			Status:    txn.Status,
 			CreatedAt: createdAt,
 			UpdatedAt: updatedAt,
+			RefundDate: func() *time.Time {
+				if txn.RefundDate.Valid {
+					refundDate, _ := time.Parse(time.RFC3339, txn.RefundDate.String)
+					return &refundDate
+				}
+				return nil
+			}(),
 		}
 	}
 
@@ -295,6 +303,13 @@ func (h *Handlers) GetAllTransactions(c *gin.Context) {
 			Status:    txn.Status,
 			CreatedAt: createdAt,
 			UpdatedAt: updatedAt,
+			RefundDate: func() *time.Time {
+				if txn.RefundDate.Valid {
+					refundDate, _ := time.Parse(time.RFC3339, txn.RefundDate.String)
+					return &refundDate
+				}
+				return nil
+			}(),
 		}
 	}
 
@@ -511,14 +526,123 @@ func (h *Handlers) Webhook(c *gin.Context) {
 		// Mark transaction as cancelled
 		if event.SessionID != "" {
 			now := time.Now().UTC().Format(time.RFC3339)
+			var paymentIntentID sql.NullString
+			if event.PaymentIntentID != "" {
+				paymentIntentID = sql.NullString{String: event.PaymentIntentID, Valid: true}
+			}
+
 			err = h.queries.UpdateTransactionWithStripeData(c.Request.Context(), db.UpdateTransactionWithStripeDataParams{
 				StripeSessionID:       sql.NullString{String: event.SessionID, Valid: true},
-				StripePaymentIntentID: sql.NullString{String: "", Valid: false},
+				StripePaymentIntentID: paymentIntentID,
 				Status:                "cancelled",
 				UpdatedAt:             now,
 			})
 			if err != nil {
-				// Log error but don't fail the webhook
+				// Log database update failure with reference IDs
+				var paymentIntentRef *string
+				if event.PaymentIntentID != "" {
+					paymentIntentRef = &event.PaymentIntentID
+				}
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.update_failed",
+					"Failed to update transaction status for expired session",
+					nil,
+					map[string]interface{}{
+						"session_id":        event.SessionID,
+						"payment_intent_id": event.PaymentIntentID,
+						"error":             err.Error(),
+					},
+					paymentIntentRef, // payment intent ID as primary reference
+					&event.SessionID, // session ID as secondary reference
+				)
+			} else {
+				// Log successful transaction update with reference IDs
+				var paymentIntentRef *string
+				if event.PaymentIntentID != "" {
+					paymentIntentRef = &event.PaymentIntentID
+				}
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.cancelled",
+					"Transaction marked as cancelled due to expired session",
+					nil,
+					map[string]interface{}{
+						"session_id":        event.SessionID,
+						"payment_intent_id": event.PaymentIntentID,
+					},
+					paymentIntentRef, // payment intent ID as primary reference
+					&event.SessionID, // session ID as secondary reference
+				)
+			}
+		}
+
+	case "payment_intent.canceled":
+		// Mark transaction as cancelled via payment intent
+		if event.PaymentIntentID != "" {
+			now := time.Now().UTC().Format(time.RFC3339)
+			err = h.queries.UpdateTransactionByPaymentIntentID(c.Request.Context(), db.UpdateTransactionByPaymentIntentIDParams{
+				StripePaymentIntentID: sql.NullString{String: event.PaymentIntentID, Valid: true},
+				Status:                "cancelled",
+				UpdatedAt:             now,
+			})
+			if err != nil {
+				// Log database update failure with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.update_failed",
+					"Failed to update transaction status for cancelled payment intent",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+						"error":             err.Error(),
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
+			} else {
+				// Log successful transaction update with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.cancelled",
+					"Transaction marked as cancelled via payment intent cancellation",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
+			}
+		}
+
+	case "charge.dispute.created", "refund.created":
+		// Mark transaction as refunded
+		if event.PaymentIntentID != "" {
+			now := time.Now().UTC().Format(time.RFC3339)
+			err = h.queries.UpdateTransactionByPaymentIntentIDWithRefundDate(c.Request.Context(), db.UpdateTransactionByPaymentIntentIDWithRefundDateParams{
+				StripePaymentIntentID: sql.NullString{String: event.PaymentIntentID, Valid: true},
+				Status:                "refunded",
+				UpdatedAt:             now,
+				RefundDate:            sql.NullString{String: now, Valid: true},
+			})
+			if err != nil {
+				// Log database update failure with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.update_failed",
+					"Failed to update transaction status for refund/dispute",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+						"event_type":        event.Type,
+						"error":             err.Error(),
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
+			} else {
+				// Log successful transaction update with payment intent reference
+				h.auditService.LogPaymentWithRefs(c.Request.Context(), "transaction.refunded",
+					"Transaction marked as refunded",
+					nil,
+					map[string]interface{}{
+						"payment_intent_id": event.PaymentIntentID,
+						"event_type":        event.Type,
+					},
+					&event.PaymentIntentID, // payment intent ID as primary reference
+					nil,                    // no secondary reference
+				)
 			}
 		}
 	}

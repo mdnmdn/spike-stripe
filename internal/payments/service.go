@@ -180,6 +180,32 @@ func (s *Service) ProcessWebhook(payload []byte, signature string) (*WebhookEven
 		if paymentIntentData, ok := event.Data.Object["payment_intent"].(string); ok {
 			webhookEvent.PaymentIntentID = paymentIntentData
 		}
+	case "payment_intent.canceled":
+		webhookEvent.Status = "cancelled"
+		if paymentIntentData, ok := event.Data.Object["id"].(string); ok {
+			webhookEvent.PaymentIntentID = paymentIntentData
+		}
+	case "charge.dispute.created":
+		webhookEvent.Status = "refunded"
+		// Extract payment intent ID from charge dispute
+		if chargeData, ok := event.Data.Object["charge"].(map[string]interface{}); ok {
+			if paymentIntentData, ok := chargeData["payment_intent"].(string); ok {
+				webhookEvent.PaymentIntentID = paymentIntentData
+			}
+		}
+	case "refund.created":
+		webhookEvent.Status = "refunded"
+		// Extract payment intent ID from refund
+		// Some refund events include payment_intent directly
+		if paymentIntentData, ok := event.Data.Object["payment_intent"].(string); ok {
+			webhookEvent.PaymentIntentID = paymentIntentData
+		}
+		// In some cases, we only have the charge ID and need to extract payment intent
+		if chargeID, ok := event.Data.Object["charge"].(string); ok {
+			// In a real implementation, you might need to look up the charge details
+			// to get the payment intent ID. For now, we'll just note that we have a charge ID.
+			_ = chargeID // Mark as used to avoid compiler error
+		}
 	}
 
 	return webhookEvent, nil

@@ -16,7 +16,7 @@ This is a minimal Go HTTP API skeleton designed for spiking Stripe payment integ
     - `service.go` - Mock payment service that mimics Stripe operations
 - **Frontend**: `cmd/server/frontend/` - Static HTML assets embedded into binary (includes admin Transactions and new Audits tabs)
 - **API specification**: `openapi.yaml` - OpenAPI 3.0 spec defining the REST endpoints
-- **Database**: `internal/db/` helpers; SQLc generated code goes here. Migrations in `db/migrations`, queries in `db/queries`. Migration runner at `cmd/migrate/`. Uses SQLite locally and Turso when `TURSO_DATABASE_URL` is set.
+- **Database**: `internal/db/` helpers; SQLc generated code goes here. Migrations in `db/migrations`, queries in `db/queries`. Migration runner at `cmd/migrate/` that tracks executed scripts in a `_migrations` table and skips them on subsequent runs. Uses SQLite locally and Turso when `TURSO_DATABASE_URL` is set.
 
 The service layer pattern allows easy swapping between mock and real Stripe implementations during development.
 
@@ -69,7 +69,7 @@ Notes:
 - If `APP_ENV` is unset, `GO_ENV` is used. If both are unset, only `.env.local` and `.env` are considered.
 
 Available variables:
-- `DB_PATH` - Optional path to local SQLite file (default: `_data/db-spike-strip.sqlite3`)
+- `DB_PATH` - Optional path to local SQLite file (default: `_data/db-spike-stripe.sqlite3`)
 - `TURSO_DATABASE_URL` - Optional: when set, connect to Turso/LibSQL
 - `TURSO_AUTH_TOKEN` - Optional token for Turso
 - `STRIPE_SECRET_KEY` - Stripe secret key (optional for mock)
@@ -92,3 +92,4 @@ The application serves both API endpoints and a basic frontend from the same ser
 ## Directives
 
 - at the end of each spike modification, update the _docs/implementations.md with all the up to date informations
+- when build create the executable to `bin/spike-spripe`

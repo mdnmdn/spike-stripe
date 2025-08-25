@@ -11,8 +11,8 @@ import (
 )
 
 const createTransaction = `-- name: CreateTransaction :exec
-INSERT INTO transactions (id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO transactions (id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at, refund_date)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTransactionParams struct {
@@ -26,6 +26,7 @@ type CreateTransactionParams struct {
 	Status                string         `json:"status"`
 	CreatedAt             string         `json:"created_at"`
 	UpdatedAt             string         `json:"updated_at"`
+	RefundDate            sql.NullString `json:"refund_date"`
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) error {
@@ -40,12 +41,13 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 		arg.Status,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.RefundDate,
 	)
 	return err
 }
 
 const getTransaction = `-- name: GetTransaction :one
-SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at
+SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at, refund_date
 FROM transactions
 WHERE id = ?
 LIMIT 1
@@ -65,12 +67,13 @@ func (q *Queries) GetTransaction(ctx context.Context, id string) (Transaction, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RefundDate,
 	)
 	return i, err
 }
 
 const getTransactionByStripeSessionID = `-- name: GetTransactionByStripeSessionID :one
-SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at
+SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at, refund_date
 FROM transactions
 WHERE stripe_session_id = ?
 LIMIT 1
@@ -90,12 +93,13 @@ func (q *Queries) GetTransactionByStripeSessionID(ctx context.Context, stripeSes
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RefundDate,
 	)
 	return i, err
 }
 
 const listAllTransactions = `-- name: ListAllTransactions :many
-SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at
+SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at, refund_date
 FROM transactions
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?
@@ -126,6 +130,7 @@ func (q *Queries) ListAllTransactions(ctx context.Context, arg ListAllTransactio
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RefundDate,
 		); err != nil {
 			return nil, err
 		}
@@ -141,7 +146,7 @@ func (q *Queries) ListAllTransactions(ctx context.Context, arg ListAllTransactio
 }
 
 const listTransactionsByUserID = `-- name: ListTransactionsByUserID :many
-SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at
+SELECT id, user_id, product_id, product_name, amount, stripe_session_id, stripe_payment_intent_id, status, created_at, updated_at, refund_date
 FROM transactions
 WHERE user_id = ?
 ORDER BY created_at DESC
@@ -174,6 +179,7 @@ func (q *Queries) ListTransactionsByUserID(ctx context.Context, arg ListTransact
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RefundDate,
 		); err != nil {
 			return nil, err
 		}
@@ -202,6 +208,29 @@ type UpdateTransactionByPaymentIntentIDParams struct {
 
 func (q *Queries) UpdateTransactionByPaymentIntentID(ctx context.Context, arg UpdateTransactionByPaymentIntentIDParams) error {
 	_, err := q.exec(ctx, q.updateTransactionByPaymentIntentIDStmt, updateTransactionByPaymentIntentID, arg.Status, arg.UpdatedAt, arg.StripePaymentIntentID)
+	return err
+}
+
+const updateTransactionByPaymentIntentIDWithRefundDate = `-- name: UpdateTransactionByPaymentIntentIDWithRefundDate :exec
+UPDATE transactions 
+SET status = ?, updated_at = ?, refund_date = ?
+WHERE stripe_payment_intent_id = ?
+`
+
+type UpdateTransactionByPaymentIntentIDWithRefundDateParams struct {
+	Status                string         `json:"status"`
+	UpdatedAt             string         `json:"updated_at"`
+	RefundDate            sql.NullString `json:"refund_date"`
+	StripePaymentIntentID sql.NullString `json:"stripe_payment_intent_id"`
+}
+
+func (q *Queries) UpdateTransactionByPaymentIntentIDWithRefundDate(ctx context.Context, arg UpdateTransactionByPaymentIntentIDWithRefundDateParams) error {
+	_, err := q.exec(ctx, q.updateTransactionByPaymentIntentIDWithRefundDateStmt, updateTransactionByPaymentIntentIDWithRefundDate,
+		arg.Status,
+		arg.UpdatedAt,
+		arg.RefundDate,
+		arg.StripePaymentIntentID,
+	)
 	return err
 }
 

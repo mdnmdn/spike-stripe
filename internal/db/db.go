@@ -81,6 +81,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateTransactionByPaymentIntentIDStmt, err = db.PrepareContext(ctx, updateTransactionByPaymentIntentID); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateTransactionByPaymentIntentID: %w", err)
 	}
+	if q.updateTransactionByPaymentIntentIDWithRefundDateStmt, err = db.PrepareContext(ctx, updateTransactionByPaymentIntentIDWithRefundDate); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateTransactionByPaymentIntentIDWithRefundDate: %w", err)
+	}
 	if q.updateTransactionStatusStmt, err = db.PrepareContext(ctx, updateTransactionStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateTransactionStatus: %w", err)
 	}
@@ -187,6 +190,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateTransactionByPaymentIntentIDStmt: %w", cerr)
 		}
 	}
+	if q.updateTransactionByPaymentIntentIDWithRefundDateStmt != nil {
+		if cerr := q.updateTransactionByPaymentIntentIDWithRefundDateStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateTransactionByPaymentIntentIDWithRefundDateStmt: %w", cerr)
+		}
+	}
 	if q.updateTransactionStatusStmt != nil {
 		if cerr := q.updateTransactionStatusStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateTransactionStatusStmt: %w", cerr)
@@ -234,29 +242,30 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                     DBTX
-	tx                                     *sql.Tx
-	createAuditEventStmt                   *sql.Stmt
-	createTransactionStmt                  *sql.Stmt
-	deleteCacheKeyStmt                     *sql.Stmt
-	getAllAuditEventsStmt                  *sql.Stmt
-	getAuditEventsByEventTypeStmt          *sql.Stmt
-	getAuditEventsByRefIDStmt              *sql.Stmt
-	getAuditEventsByRefID2Stmt             *sql.Stmt
-	getAuditEventsBySubsystemStmt          *sql.Stmt
-	getAuditEventsBySubsystemAndTypeStmt   *sql.Stmt
-	getAuditEventsByUserStmt               *sql.Stmt
-	getAuditEventsInDateRangeStmt          *sql.Stmt
-	getCacheValueStmt                      *sql.Stmt
-	getTransactionStmt                     *sql.Stmt
-	getTransactionByStripeSessionIDStmt    *sql.Stmt
-	listAllTransactionsStmt                *sql.Stmt
-	listCacheStmt                          *sql.Stmt
-	listTransactionsByUserIDStmt           *sql.Stmt
-	setCacheValueStmt                      *sql.Stmt
-	updateTransactionByPaymentIntentIDStmt *sql.Stmt
-	updateTransactionStatusStmt            *sql.Stmt
-	updateTransactionWithStripeDataStmt    *sql.Stmt
+	db                                                   DBTX
+	tx                                                   *sql.Tx
+	createAuditEventStmt                                 *sql.Stmt
+	createTransactionStmt                                *sql.Stmt
+	deleteCacheKeyStmt                                   *sql.Stmt
+	getAllAuditEventsStmt                                *sql.Stmt
+	getAuditEventsByEventTypeStmt                        *sql.Stmt
+	getAuditEventsByRefIDStmt                            *sql.Stmt
+	getAuditEventsByRefID2Stmt                           *sql.Stmt
+	getAuditEventsBySubsystemStmt                        *sql.Stmt
+	getAuditEventsBySubsystemAndTypeStmt                 *sql.Stmt
+	getAuditEventsByUserStmt                             *sql.Stmt
+	getAuditEventsInDateRangeStmt                        *sql.Stmt
+	getCacheValueStmt                                    *sql.Stmt
+	getTransactionStmt                                   *sql.Stmt
+	getTransactionByStripeSessionIDStmt                  *sql.Stmt
+	listAllTransactionsStmt                              *sql.Stmt
+	listCacheStmt                                        *sql.Stmt
+	listTransactionsByUserIDStmt                         *sql.Stmt
+	setCacheValueStmt                                    *sql.Stmt
+	updateTransactionByPaymentIntentIDStmt               *sql.Stmt
+	updateTransactionByPaymentIntentIDWithRefundDateStmt *sql.Stmt
+	updateTransactionStatusStmt                          *sql.Stmt
+	updateTransactionWithStripeDataStmt                  *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -282,7 +291,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		listTransactionsByUserIDStmt:           q.listTransactionsByUserIDStmt,
 		setCacheValueStmt:                      q.setCacheValueStmt,
 		updateTransactionByPaymentIntentIDStmt: q.updateTransactionByPaymentIntentIDStmt,
-		updateTransactionStatusStmt:            q.updateTransactionStatusStmt,
-		updateTransactionWithStripeDataStmt:    q.updateTransactionWithStripeDataStmt,
+		updateTransactionByPaymentIntentIDWithRefundDateStmt: q.updateTransactionByPaymentIntentIDWithRefundDateStmt,
+		updateTransactionStatusStmt:                          q.updateTransactionStatusStmt,
+		updateTransactionWithStripeDataStmt:                  q.updateTransactionWithStripeDataStmt,
 	}
 }

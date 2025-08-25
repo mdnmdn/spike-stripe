@@ -29,6 +29,7 @@ type Querier interface {
 	ListTransactionsByUserID(ctx context.Context, arg ListTransactionsByUserIDParams) ([]Transaction, error)
 	SetCacheValue(ctx context.Context, arg SetCacheValueParams) error
 	UpdateTransactionByPaymentIntentID(ctx context.Context, arg UpdateTransactionByPaymentIntentIDParams) error
+	UpdateTransactionByPaymentIntentIDWithRefundDate(ctx context.Context, arg UpdateTransactionByPaymentIntentIDWithRefundDateParams) error
 	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) error
 	UpdateTransactionWithStripeData(ctx context.Context, arg UpdateTransactionWithStripeDataParams) error
 }

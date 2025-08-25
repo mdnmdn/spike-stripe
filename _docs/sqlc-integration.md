@@ -3,7 +3,7 @@
 This guide explains how to extend the database schema (add tables) and how to build Go data-access code using SQLc in this project. It assumes you skimmed `_docs/sqlc.md` for an overview.
 
 ## TL;DR
-- Add a new migration file under `db/migrations/` (e.g., `0002_orders.sql`). Use idempotent SQL (CREATE TABLE IF NOT EXISTS, etc.) because the built-in runner re-applies all files on every run.
+- Add a new migration file under `db/migrations/` (e.g., `0002_orders.sql`). The built-in runner now tracks executed scripts in a `_migrations` table and skips any script whose filename has already been applied.
 - Add one or more query files under `db/queries/` (e.g., `orders.sql`) with SQLc annotations (`-- name: ... :one|:many|:exec|:execrows|:batchexec`).
 - Run `sqlc generate` to produce/update Go code in `internal/db`.
 - Use `internal/db.NewConnection()` to obtain a `*sql.DB`, then `db.New(db)` to get a generated `Queries` instance (or use the generated `Querier` interface).
@@ -15,8 +15,8 @@ This guide explains how to extend the database schema (add tables) and how to bu
 - Config: `sqlc.yaml` generates Go into `internal/db` using engine `sqlite`, schema from `db/migrations`, and queries from `db/queries`.
 - Connections: `internal/db/connection.go` chooses between:
     - Turso/LibSQL when `TURSO_DATABASE_URL` is set (and `TURSO_AUTH_TOKEN` optionally), or
-    - local SQLite file (path from `DB_PATH` or default `_data/db-spike-strip.sqlite3`).
-- Migrations: `internal/db/migrate.go` applies all `*.sql` files from `db/migrations` in lexical order. The runner does not track state; make your migrations idempotent.
+    - local SQLite file (path from `DB_PATH` or default `_data/db-spike-stripe.sqlite3`).
+- Migrations: `internal/db/migrate.go` applies all `*.sql` files from `db/migrations` in lexical order. It maintains a `_migrations` table (name TEXT PRIMARY KEY, applied_at TEXT) and skips any file already recorded. You can still write idempotent SQL for safety, but it is no longer required for avoiding reapplication.
 - Server: `RUN_MIGRATION=true` will run migrations on startup (after dotenv is loaded).
 
 ## Add a new table (example: orders)
@@ -159,9 +159,10 @@ APP_ENV=development RUN_MIGRATION=true ./stripe-go-spike
 ```
 
 Migration runner behavior in this repo:
-- Applies all `*.sql` files in lexical order every time it runs.
-- Does not keep a migrations table; therefore use idempotent SQL (`IF NOT EXISTS`, `DROP TABLE IF EXISTS`, `CREATE INDEX IF NOT EXISTS`, etc.)
-- If you need non-idempotent, stateful migrations (e.g., data backfills you don’t want to re-run), add your own guard logic within the SQL (e.g., `INSERT ... SELECT ... WHERE NOT EXISTS(...)`), or adopt a full-featured tool (e.g., goose, atlas, flyway) and wire it in.
+- Applies all `*.sql` files in lexical order.
+- Tracks executed scripts in a `_migrations` table keyed by filename and skips any already-present names.
+- You can still write idempotent SQL (`IF NOT EXISTS`, etc.) as a defensive practice, but it is not required for avoiding reapplication.
+- For complex stateful/data migrations, consider a dedicated tool (goose, atlas, flyway) if needed.
 
 ## Testing tips
 - Use a temp SQLite database file per test, or in-memory:

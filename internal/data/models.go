@@ -16,16 +16,17 @@ type Product struct {
 }
 
 type Transaction struct {
-	ID                    string    `json:"id"`
-	UserID                string    `json:"user_id"`
-	ProductID             string    `json:"product_id"`
-	ProductName           string    `json:"product_name"`
-	Amount                int64     `json:"amount"`
-	StripeSessionID       *string   `json:"stripe_session_id,omitempty"`
-	StripePaymentIntentID *string   `json:"stripe_payment_intent_id,omitempty"`
-	Status                string    `json:"status"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	ID                    string     `json:"id"`
+	UserID                string     `json:"user_id"`
+	ProductID             string     `json:"product_id"`
+	ProductName           string     `json:"product_name"`
+	Amount                int64      `json:"amount"`
+	StripeSessionID       *string    `json:"stripe_session_id,omitempty"`
+	StripePaymentIntentID *string    `json:"stripe_payment_intent_id,omitempty"`
+	Status                string     `json:"status"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	RefundDate            *time.Time `json:"refund_date,omitempty"`
 }
 
 // Hardcoded users for the spike
